@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, booking_card, service_card, request_card, verified_badge, provider_rating, status_badge %}
+{% block title %}Dashboard · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="page-section">
+  <div class="container">
+    <div class="dashboard-head">
+      <div>
+        <span class="eyebrow">{{ today|date('%A, %d %B %Y') }}</span>
+        <h1>{{ 'Good morning' if now.hour < 12 else ('Good afternoon' if now.hour < 17 else 'Good evening') }}, {{ current_user.first_name }}.</h1>
+        <p>Here is what is happening across your bookings, services, and wallet.</p>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        {% if not current_user.is_admin %}
+        <a class="btn btn-gold" href="{{ url_for('listings.create') }}"><i class="bi bi-plus-lg"></i> New listing</a>
+        <a class="btn btn-outline-brand" href="{{ url_for('requests.create') }}"><i class="bi bi-megaphone"></i> Post a request</a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if not current_user.is_verified %}
+    <div class="welcome-strip">
+      <i class="bi bi-patch-check"></i>
+      <p><strong>Complete your student verification.</strong> An administrator can verify your student number to add a trust badge to your profile. {% if not current_user.campus_area or not current_user.program %}<a href="{{ url_for('main.edit_profile') }}">Finish your profile</a> first.{% endif %}</p>
+    </div>
+    {% endif %}
+
+    <div class="action-grid">
+      <a class="action-card {{ 'warn' if action_counts.to_accept }}" href="{{ url_for('bookings.index', view='providing', state='active') }}">
+        <span class="action-icon"><i class="bi bi-inbox"></i></span>
+        <strong>{{ action_counts.to_accept }}</strong>
+        <span>requests to accept</span>
+      </a>
+      <a class="action-card {{ 'warn' if action_counts.to_pay }}" href="{{ url_for('bookings.index', view='seeking', state='active') }}">
+        <span class="action-icon"><i class="bi bi-wallet2"></i></span>
+        <strong>{{ action_counts.to_pay }}</strong>
+        <span>bookings to pay</span>
+      </a>
+      <a class="action-card {{ 'warn' if action_counts.to_deliver }}" href="{{ url_for('bookings.index', view='providing', state='active') }}">
+        <span class="action-icon"><i class="bi bi-box-seam"></i></span>
+        <strong>{{ action_counts.to_deliver }}</strong>
+        <span>jobs to deliver</span>
+      </a>
+      <a class="action-card {{ 'warn' if action_counts.to_confirm }}" href="{{ url_for('bookings.index', view='seeking', state='active') }}">
+        <span class="action-icon"><i class="bi bi-check2-circle"></i></span>
+        <strong>{{ action_counts.to_confirm }}</strong>
+        <span>deliveries to confirm</span>
+      </a>
+    </div>
+
+    <div class="dashboard-grid">
+      <div>
+        <div class="panel mb-4">
+          <div class="panel-head">
+            <div><h2>Active bookings</h2><p>Your next scheduled jobs and requests.</p></div>
+            <a class="section-link" href="{{ url_for('bookings.index') }}">All bookings <i class="bi bi-arrow-right"></i></a>
+          </div>
+          {% if active_bookings %}
+          <div class="booking-list">
+            {% for booking in active_bookings %}{{ booking_card(booking, current_user) }}{% endfor %}
+          </div>
+          {% else %}
+          <div class="empty-state py-4">
+            <div class="empty-icon"><i class="bi bi-calendar2-week"></i></div>
+            <h3>No active bookings yet</h3>
+            <p>Book a service or accept a request and it will show up here with its full timeline.</p>
+            <a class="btn btn-brand btn-sm" href="{{ url_for('listings.browse') }}">Find a service</a>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if listings %}
+        <div class="panel mb-4">
+          <div class="panel-head">
+            <div><h2>Your services</h2><p>{{ listing_count }} listing{{ '' if listing_count == 1 else 's' }} · manage availability and pricing.</p></div>
+            <a class="section-link" href="{{ url_for('listings.my_services') }}">Manage <i class="bi bi-arrow-right"></i></a>
+          </div>
+          <div class="row g-3">
+            {% for service in listings %}
+            <div class="col-md-6">
+              <a class="d-flex gap-3 align-items-center p-2 rounded-3" href="{{ url_for('listings.detail', service_id=service.id) }}">
+                <span class="mini-thumb" style="--cat: {{ service.category.color }}; width:46px;height:46px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;color:#fff;background:var(--cat);flex-shrink:0;"><i class="bi {{ service.category.icon }}"></i></span>
+                <span class="min-w-0">
+                  <strong class="d-block text-truncate" style="font-size:12.5px;">{{ service.title }}</strong>
+                  <span class="small-note">{{ service.price|money }} / {{ service.price_unit|replace('per ', '') }} · {{ service.status_meta.label }}</span>
+                </span>
+              </a>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if open_requests %}
+        <div class="panel">
+          <div class="panel-head">
+            <div><h2>Open requests near you</h2><p>Providers can send offers on these student requests.</p></div>
+            <a class="section-link" href="{{ url_for('requests.index') }}">View all <i class="bi bi-arrow-right"></i></a>
+          </div>
+          <div class="row g-3">
+            {% for item in open_requests %}<div class="col-md-6">{{ request_card(item) }}</div>{% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <aside class="side-stack">
+        <div class="wallet-card">
+          <span class="wallet-label">Demo wallet balance</span>
+          <div class="wallet-amount">{{ current_user.wallet_balance|money }}</div>
+          <div class="wallet-note">Simulated funds for testing the escrow flow.</div>
+          <div class="wallet-actions">
+            <a class="btn btn-gold btn-sm" href="{{ url_for('main.wallet') }}">Top up</a>
+            <a class="btn btn-outline-light btn-sm" href="{{ url_for('main.wallet') }}">History</a>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Escrow at a glance</h3>
+            <i class="bi bi-shield-check text-brand"></i>
+          </div>
+          <div class="mini-escrow"><span>Currently held for your bookings</span><strong>{{ escrow_total|money }}</strong></div>
+          <div class="mini-escrow"><span>Your rating as a provider</span><strong>{{ current_user.rating_display }}{% if current_user.review_count %} / 5{% endif %}</strong></div>
+          <div class="mini-escrow"><span>Completed as provider</span><strong>{{ current_user.completed_bookings }}</strong></div>
+          <div class="mini-escrow"><span>Completion rate</span><strong>{{ current_user.completion_display }}</strong></div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Notifications</h3>
+            <a class="small-note" href="{{ url_for('main.notifications') }}">View all</a>
+          </div>
+          {% if notifications %}
+          <div class="notice-list">
+            {% for notification in notifications %}
+            <div class="notice-item">
+              <span class="notice-dot"></span>
+              <div>
+                <a href="{{ url_for('main.open_notification', notification_id=notification.id) }}">{{ notification.title }}</a>
+                <span class="notice-time">{{ notification.created_at|datetime('%d %b, %H:%M') }}</span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="small-note mb-0">You have no notifications yet.</p>
+          {% endif %}
+        </div>
+
+        {% if suggested %}
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Suggested for you</h3>
+            <a class="small-note" href="{{ url_for('listings.browse') }}">Browse</a>
+          </div>
+          {% for service in suggested %}
+          <a class="mini-service" href="{{ url_for('listings.detail', service_id=service.id) }}">
+            <span class="mini-thumb" style="--cat: {{ service.category.color }};"><i class="bi {{ service.category.icon }}"></i></span>
+            <span class="min-w-0">
+              <h4 class="text-truncate">{{ service.title }}</h4>
+              <span>{{ service.provider.full_name }} · {{ service.price|money }}</span>
+            </span>
+          </a>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </aside>
+    </div>
+  </div>
+</div>
+{% endblock %}

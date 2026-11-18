@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, rating_stars, pagination_nav %}
+{% block title %}Students · Admin · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <div class="page-section">
+    <div class="container">
+      {% include "admin/_nav.html" %}
+
+      <div class="admin-head">
+        <div>
+          <h1>Students</h1>
+          <p>Verify student numbers, review wallet balances, and moderate accounts.</p>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-ink btn-sm" href="{{ url_for('admin.export_users') }}"><i class="bi bi-download"></i> Export CSV</a>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div class="status-tabs">
+          <a class="{{ 'active' if state == 'all' }}" href="{{ url_for('admin.users', state='all', q=q) }}">All <span class="count">{{ counts.all }}</span></a>
+          <a class="{{ 'active' if state == 'verified' }}" href="{{ url_for('admin.users', state='verified', q=q) }}">Verified <span class="count">{{ counts.verified }}</span></a>
+          <a class="{{ 'active' if state == 'unverified' }}" href="{{ url_for('admin.users', state='unverified', q=q) }}">Unverified <span class="count">{{ counts.unverified }}</span></a>
+          <a class="{{ 'active' if state == 'suspended' }}" href="{{ url_for('admin.users', state='suspended', q=q) }}">Suspended <span class="count">{{ counts.suspended }}</span></a>
+        </div>
+        <span class="small-note">{{ pagination.total }} account{{ '' if pagination.total == 1 else 's' }}</span>
+      </div>
+
+      <form class="admin-filter" method="get" action="{{ url_for('admin.users') }}">
+        <input type="hidden" name="state" value="{{ state }}">
+        <div class="search-field">
+          <i class="bi bi-search"></i>
+          <label class="sr-only" for="user-search">Search students</label>
+          <input class="form-control" id="user-search" type="search" name="q" value="{{ q }}" placeholder="Search name, email, or student number">
+        </div>
+        <button class="btn btn-brand" type="submit">Search</button>
+        {% if q %}<a class="btn btn-ghost" href="{{ url_for('admin.users', state=state) }}">Clear</a>{% endif %}
+      </form>
+
+      <div class="chart-card">
+        <div class="table-scroll">
+          <table class="site-table">
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Student number</th>
+                <th>Programme</th>
+                <th>Wallet</th>
+                <th>Reputation</th>
+                <th>Status</th>
+                <th>Joined</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for user in users %}
+              <tr>
+                <td>
+                  <span class="table-user">
+                    {{ avatar(user, 'sm') }}
+                    <span>
+                      <strong>{{ user.full_name }}</strong>
+                      <span>{{ user.email }}</span>
+                    </span>
+                  </span>
+                </td>
+                <td>{{ user.student_number }}</td>
+                <td><span class="small-note">{{ user.program or '—' }}{% if user.year_of_study %}<br>{{ user.year_of_study }}{% endif %}</span></td>
+                <td>{{ user.wallet_balance|money }}</td>
+                <td>
+                  {% if user.review_count %}
+                  <span class="d-inline-flex align-items-center gap-1">{{ rating_stars(user.rating_avg) }} <strong style="font-size: 11px;">{{ user.rating_display }}</strong></span>
+                  <span class="small-note d-block">{{ user.completed_bookings }} job{{ '' if user.completed_bookings == 1 else 's' }} · {{ user.review_count }} review{{ '' if user.review_count == 1 else 's' }}</span>
+                  {% else %}
+                  <span class="small-note">New provider</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if user.is_suspended %}<span class="badge-soft badge-soft-danger">Suspended</span>
+                  {% elif user.is_admin %}<span class="badge-soft badge-soft-purple">Admin</span>
+                  {% elif user.is_verified %}<span class="badge-soft badge-soft-success">Verified</span>
+                  {% else %}<span class="badge-soft badge-soft-warning">Unverified</span>{% endif %}
+                </td>
+                <td><span class="small-note">{{ user.created_at|date('%d %b %Y') }}</span></td>
+                <td>
+                  <div class="table-actions">
+                    <a class="btn btn-outline-ink" href="{{ url_for('main.profile', user_id=user.id) }}">Profile</a>
+                    {% if not user.is_admin %}
+                    <form method="post" action="{{ url_for('admin.verify_user', user_id=user.id) }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="btn btn-outline-ink" type="submit">{{ 'Unverify' if user.is_verified else 'Verify' }}</button>
+                    </form>
+                    {% if user.is_suspended %}
+                    <form method="post" action="{{ url_for('admin.unsuspend_user', user_id=user.id) }}" data-confirm="Reinstate {{ user.full_name }}?">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="btn btn-soft" type="submit">Reinstate</button>
+                    </form>
+                    {% else %}
+                    <button class="btn btn-danger-soft" type="button" data-bs-toggle="modal" data-bs-target="#suspendModal" data-action="{{ url_for('admin.suspend_user', user_id=user.id) }}" data-user="{{ user.full_name }}">Suspend</button>
+                    {% endif %}
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="8" class="table-empty">No accounts match this filter.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="mt-4">{{ pagination_nav(pagination, 'Student pages') }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="suspendModal" tabindex="-1" aria-labelledby="suspendModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="suspendModalLabel">Suspend <span class="suspend-user-name"></span></h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small-note">Suspending signs the student out, hides their active listings, and blocks new bookings. Existing escrow bookings remain available to admins.</p>
+          <label class="form-label" for="suspend-reason">Reason</label>
+          <textarea class="form-control" id="suspend-reason" name="reason" rows="3" maxlength="500" placeholder="Explain the policy issue. This is included in the student's notification." required></textarea>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" type="button" data-bs-dismiss="modal">Cancel</button>
+          <button class="btn btn-danger-soft" type="submit"><i class="bi bi-slash-circle"></i> Suspend account</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import pagination_nav %}
+{% block title %}Notifications · {{ APP_NAME }}{% endblock %}
+{% block content %}
+{% set icons = {'booking': 'bi-calendar2-check', 'message': 'bi-chat-dots', 'review': 'bi-star', 'request': 'bi-megaphone', 'dispute': 'bi-exclamation-octagon', 'account': 'bi-person-check', 'moderation': 'bi-shield-exclamation'} %}
+<div class="page-head">
+  <div class="container">
+    <div class="breadcrumbs"><a href="{{ url_for('main.dashboard') }}">Dashboard</a><i class="bi bi-chevron-right"></i><span>Notifications</span></div>
+    <div class="d-flex justify-content-between align-items-end gap-3 flex-wrap">
+      <div>
+        <h1>Notifications</h1>
+        <p>Booking updates, messages, reviews, and account notices in one place.</p>
+      </div>
+      {% if items %}
+      <form method="post" action="{{ url_for('main.read_all_notifications') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-outline-ink btn-sm" type="submit"><i class="bi bi-check2-all"></i> Mark all as read</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<div class="page-section">
+  <div class="container" style="max-width: 860px;">
+    {% if items %}
+    <div class="notification-list">
+      {% for notification in items %}
+      <a class="notification-card {{ 'unread' if not notification.is_read }}" href="{{ url_for('main.open_notification', notification_id=notification.id) }}">
+        <span class="notification-icon"><i class="bi {{ icons.get(notification.category, 'bi-bell') }}"></i></span>
+        <span class="notification-body">
+          <strong>{{ notification.title }}</strong>
+          {% if notification.body %}<p>{{ notification.body }}</p>{% endif %}
+          <time>{{ notification.created_at|datetime('%d %b %Y, %H:%M') }}</time>
+        </span>
+        <i class="bi bi-chevron-right notification-action"></i>
+      </a>
+      {% endfor %}
+    </div>
+    {{ pagination_nav(pagination, 'Notifications') }}
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-icon"><i class="bi bi-bell"></i></div>
+      <h3>No notifications yet</h3>
+      <p>When bookings, offers, messages or reviews involve you, updates will appear here.</p>
+      <a class="btn btn-brand" href="{{ url_for('main.dashboard') }}">Back to dashboard</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

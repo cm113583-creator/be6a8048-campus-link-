@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} — {{ title }} · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="error-page">
+  <div>
+    <div class="error-code">{{ code }}</div>
+    <h1>{{ title }}</h1>
+    <p>{{ message }}</p>
+    <div class="d-flex justify-content-center gap-2 flex-wrap">
+      <a class="btn btn-brand" href="{{ url_for('main.home') }}"><i class="bi bi-house-door"></i> Back home</a>
+      <a class="btn btn-outline-ink" href="{{ url_for('listings.browse') }}">Browse services</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

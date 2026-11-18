@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import field_error %}
+{% block title %}Join CampusLink · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="auth-page">
+  <aside class="auth-visual">
+    <a class="brand brand-light" href="{{ url_for('main.home') }}">
+      <span class="brand-mark"><i class="bi bi-link-45deg"></i></span>
+      <span class="brand-text">Campus<span>Link</span></span>
+    </a>
+    <div class="auth-visual-content">
+      <h2>Turn campus skills into trusted work.</h2>
+      <p>Join a marketplace built for Cavendish students. Find help with your studies, earn from your talents, and build a reputation that follows you beyond graduation.</p>
+      <div class="auth-benefits">
+        <div class="auth-benefit"><i class="bi bi-people"></i> Post requests and compare offers</div>
+        <div class="auth-benefit"><i class="bi bi-wallet2"></i> Simulated wallet with escrow safety</div>
+        <div class="auth-benefit"><i class="bi bi-graph-up-arrow"></i> Transparent reputation scoring</div>
+        <div class="auth-benefit"><i class="bi bi-calendar2-week"></i> Scheduling and booking tools</div>
+      </div>
+    </div>
+    <div class="auth-quote">
+      <p>“CampusLink gave me a way to show my photography work and get paid by people who already share my campus.”</p>
+      <div class="quote-person">
+        <span class="avatar avatar-sm avatar-tone-1">NM</span>
+        <div><strong>Natasha M.</strong><span>Student photographer</span></div>
+      </div>
+    </div>
+  </aside>
+  <div class="auth-main">
+    <div class="auth-card">
+      <h1>Create your account</h1>
+      <p class="auth-intro">Free for Cavendish students. Verified accounts earn a trust badge.</p>
+      <div class="auth-form">
+        <form method="post" novalidate>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <div class="form-section-title">Student details</div>
+          <div class="mb-3">
+            <label class="form-label" for="full_name">Full name</label>
+            <input class="form-control {{ 'is-invalid' if errors.get('full_name') }}" id="full_name" name="full_name" value="{{ form.get('full_name', '') }}" placeholder="e.g. Chama Mwelwa" autocomplete="name" required>
+            {{ field_error(errors, 'full_name') }}
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="student_number">Student number</label>
+              <input class="form-control {{ 'is-invalid' if errors.get('student_number') }}" id="student_number" name="student_number" value="{{ form.get('student_number', '') }}" placeholder="113-583" required>
+              {{ field_error(errors, 'student_number') }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="phone">Phone <span class="text-muted fw-normal">(optional)</span></label>
+              <input class="form-control {{ 'is-invalid' if errors.get('phone') }}" id="phone" name="phone" value="{{ form.get('phone', '') }}" placeholder="+260 97 000 0000" autocomplete="tel">
+              {{ field_error(errors, 'phone') }}
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="email">Student email</label>
+              <input class="form-control {{ 'is-invalid' if errors.get('email') }}" id="email" name="email" type="email" value="{{ form.get('email', '') }}" placeholder="you@student.cavendish.ac.zm" autocomplete="email" required>
+              {{ field_error(errors, 'email') }}
+            </div>
+            <div class="col-md-7">
+              <label class="form-label" for="program">Programme</label>
+              <select class="form-select {{ 'is-invalid' if errors.get('program') }}" id="program" name="program" required>
+                <option value="">Choose your programme</option>
+                {% for programme in programs %}<option value="{{ programme }}" {{ 'selected' if form.get('program') == programme }}>{{ programme }}</option>{% endfor %}
+              </select>
+              {{ field_error(errors, 'program') }}
+            </div>
+            <div class="col-md-5">
+              <label class="form-label" for="year_of_study">Year of study</label>
+              <select class="form-select {{ 'is-invalid' if errors.get('year_of_study') }}" id="year_of_study" name="year_of_study" required>
+                <option value="">Year</option>
+                {% for year in years %}<option value="{{ year }}" {{ 'selected' if form.get('year_of_study') == year }}>{{ year }}</option>{% endfor %}
+              </select>
+              {{ field_error(errors, 'year_of_study') }}
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="campus_area">Main campus area</label>
+              <select class="form-select {{ 'is-invalid' if errors.get('campus_area') }}" id="campus_area" name="campus_area" required>
+                <option value="">Where do you usually meet?</option>
+                {% for area in CAMPUS_AREAS %}<option value="{{ area }}" {{ 'selected' if form.get('campus_area') == area }}>{{ area }}</option>{% endfor %}
+              </select>
+              {{ field_error(errors, 'campus_area') }}
+            </div>
+          </div>
+
+          <div class="form-section-title">Secure your account</div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="password">Password</label>
+              <div class="password-field">
+                <input class="form-control {{ 'is-invalid' if errors.get('password') }}" id="password" name="password" type="password" autocomplete="new-password" required>
+                <button class="password-toggle" type="button" aria-label="Show password"><i class="bi bi-eye"></i></button>
+              </div>
+              {{ field_error(errors, 'password') }}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="confirm_password">Confirm password</label>
+              <div class="password-field">
+                <input class="form-control {{ 'is-invalid' if errors.get('confirm_password') }}" id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required>
+                <button class="password-toggle" type="button" aria-label="Show password"><i class="bi bi-eye"></i></button>
+              </div>
+              {{ field_error(errors, 'confirm_password') }}
+            </div>
+          </div>
+          <div class="helper-note mt-3"><i class="bi bi-shield-lock"></i><span>Use at least 8 characters with a letter and a number. Passwords are stored as secure hashes.</span></div>
+          <button class="btn btn-brand btn-lg mt-4" type="submit">Create account <i class="bi bi-arrow-right"></i></button>
+        </form>
+      </div>
+      <p class="auth-switch">Already have an account? <a href="{{ url_for('auth.login') }}">Log in</a></p>
+    </div>
+  </div>
+</div>
+{% endblock %}

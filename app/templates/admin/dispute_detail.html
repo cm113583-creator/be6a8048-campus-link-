@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, status_badge, provider_rating %}
+{% block title %}Dispute {{ booking.reference }} · Admin · {{ APP_NAME }}{% endblock %}
+{% block content %}
+{% set payment = booking.payment %}
+<div class="admin-page">
+  <div class="page-section">
+    <div class="container">
+      {% include "admin/_nav.html" %}
+
+      <div class="admin-head">
+        <div>
+          <div class="breadcrumbs mb-2" style="font-size: 11.5px; color: var(--muted);">
+            <a href="{{ url_for('admin.disputes') }}" style="color: var(--muted);">Disputes</a>
+            <i class="bi bi-chevron-right" style="font-size: 9px;"></i>
+            <span>{{ booking.reference }}</span>
+          </div>
+          <h1>{{ booking.title }}</h1>
+          <p>Case opened {{ dispute.created_at|datetime('%d %b %Y, %H:%M') }} · {{ booking.reference }}</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+          {{ status_badge(dispute.status_meta) }}
+          <a class="btn btn-outline-ink btn-sm" href="{{ url_for('bookings.detail', booking_id=booking.id) }}">Open booking</a>
+        </div>
+      </div>
+
+      <div class="admin-grid">
+        <div>
+          <div class="chart-card mb-4">
+            <div class="chart-head">
+              <div><h2>Dispute details</h2><p>What the parties reported.</p></div>
+              {{ status_badge(dispute.status_meta) }}
+            </div>
+            <div class="d-flex gap-3 align-items-start mb-3">
+              <span class="dispute-icon"><i class="bi bi-flag"></i></span>
+              <div>
+                <strong>{{ dispute.reason }}</strong>
+                <p class="request-description mt-2 mb-0">{{ dispute.details }}</p>
+              </div>
+            </div>
+            <div class="people-row">
+              {{ avatar(dispute.opened_by, 'sm') }}
+              <div class="person-info">
+                <strong>{{ dispute.opened_by.full_name }}</strong>
+                <span>Opened the case · {{ dispute.opened_by.email }}</span>
+              </div>
+              <span class="small-note">{{ dispute.created_at|datetime('%d %b %Y, %H:%M') }}</span>
+            </div>
+            {% if dispute.resolved_at %}
+            <div class="people-row">
+              <div class="person-info">
+                <strong>Resolved{% if dispute.resolved_by %} by {{ dispute.resolved_by.full_name }}{% endif %}</strong>
+                <span>{{ dispute.resolved_at|datetime('%d %b %Y, %H:%M') }}</span>
+              </div>
+              {{ status_badge(dispute.status_meta) }}
+            </div>
+            {% endif %}
+            {% if dispute.resolution_note %}
+            <div class="booking-meta-item mt-3">
+              <span>Resolution note</span>
+              <strong style="font-weight: 500; line-height: 1.6;">{{ dispute.resolution_note }}</strong>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="chart-card">
+            <div class="chart-head">
+              <div><h2>Booking context</h2><p>The job and money behind this case.</p></div>
+              {{ status_badge(booking.status_meta) }}
+            </div>
+            <p class="request-description mb-3">{{ booking.description }}</p>
+            <div class="booking-meta-grid mb-3">
+              <div class="booking-meta-item"><span>Scheduled</span><strong>{{ booking.scheduled_at|datetime('%d %b %Y, %H:%M') }}</strong></div>
+              <div class="booking-meta-item"><span>Duration</span><strong>{{ booking.quantity_label() }}</strong></div>
+              <div class="booking-meta-item"><span>Location</span><strong>{{ booking.location }}</strong></div>
+              <div class="booking-meta-item"><span>Amount</span><strong>{{ booking.price|money }}</strong></div>
+            </div>
+            <div class="people-row">
+              {{ avatar(booking.seeker, 'sm') }}
+              <div class="person-info"><strong>{{ booking.seeker.full_name }}</strong><span>Seeker · {{ booking.seeker.email }}</span></div>
+              <a class="btn btn-outline-ink btn-sm" href="{{ url_for('main.profile', user_id=booking.seeker.id) }}">Profile</a>
+            </div>
+            <div class="people-row">
+              {{ avatar(booking.provider, 'sm') }}
+              <div class="person-info"><strong>{{ booking.provider.full_name }}</strong><span>Provider · {{ booking.provider.email }}</span></div>
+              {{ provider_rating(booking.provider) }}
+              <a class="btn btn-outline-ink btn-sm" href="{{ url_for('main.profile', user_id=booking.provider.id) }}">Profile</a>
+            </div>
+            {% if payment %}
+            <div class="escrow-summary mt-3">
+              <span class="small-note">Escrow amount</span>
+              <div class="escrow-amount">{{ payment.amount|money }}</div>
+              <div class="escrow-line"><span>Platform fee (5%)</span><span>{{ payment.platform_fee|money }}</span></div>
+              <div class="escrow-line"><span>Provider share</span><span>{{ payment.provider_amount|money }}</span></div>
+              <div class="escrow-line total"><span>Payment status</span><span>{{ payment.status_label }}</span></div>
+            </div>
+            {% else %}
+            <div class="alert app-alert alert-warning mt-3 mb-0"><i class="bi bi-exclamation-triangle"></i><div>No payment record is attached to this booking.</div></div>
+            {% endif %}
+          </div>
+        </div>
+
+        <aside>
+          {% if dispute.status == 'open' %}
+          <div class="resolve-panel mb-4">
+            <div class="chart-head">
+              <div><h2>Resolve this case</h2><p>Pick an outcome and leave a note for both parties.</p></div>
+            </div>
+            {% if payment and payment.status == 'held' %}
+            <form method="post" action="{{ url_for('admin.resolve_dispute', dispute_id=dispute.id) }}" data-confirm="Resolve this dispute? This moves escrow immediately and cannot be undone.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="resolution-choice">
+                <div>
+                  <input type="radio" id="action-refund" name="action" value="refund" required>
+                  <label for="action-refund">
+                    <strong>Refund the seeker</strong>
+                    <span>Return {{ payment.amount|money }} to {{ booking.seeker.first_name }}'s wallet and mark the booking refunded.</span>
+                  </label>
+                </div>
+                <div>
+                  <input type="radio" id="action-release" name="action" value="release">
+                  <label for="action-release">
+                    <strong>Release to the provider</strong>
+                    <span>Pay {{ payment.provider_amount|money }} to {{ booking.provider.first_name }} and complete the booking.</span>
+                  </label>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="resolution-note">Resolution note</label>
+                <textarea class="form-control" id="resolution-note" name="resolution_note" rows="4" minlength="5" maxlength="1000" placeholder="Explain the decision. Both parties receive this note." required></textarea>
+              </div>
+              <button class="btn btn-brand w-100" type="submit"><i class="bi bi-shield-check"></i> Resolve &amp; apply outcome</button>
+            </form>
+            {% else %}
+            <div class="alert app-alert alert-warning mb-0"><i class="bi bi-exclamation-triangle"></i><div>Escrow is not in a held state, so it cannot be released or refunded from here. Review the payment record.</div></div>
+            {% endif %}
+          </div>
+          {% else %}
+          <div class="resolve-panel mb-4">
+            <div class="chart-head"><div><h2>Case resolved</h2><p>The escrow outcome has been applied.</p></div></div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+              {{ status_badge(dispute.status_meta) }}
+              <strong style="font-size: 13px;">{{ booking.status_meta.label }}</strong>
+            </div>
+            {% if dispute.resolution_note %}<p class="small-note">{{ dispute.resolution_note }}</p>{% endif %}
+            <span class="small-note">Resolved {{ dispute.resolved_at|datetime('%d %b %Y, %H:%M') if dispute.resolved_at else '' }}{% if dispute.resolved_by %} by {{ dispute.resolved_by.full_name }}{% endif %}.</span>
+            <a class="btn btn-outline-ink w-100 mt-3" href="{{ url_for('bookings.detail', booking_id=booking.id) }}">View booking record</a>
+          </div>
+          {% endif %}
+
+          <div class="chart-card">
+            <div class="chart-head"><div><h2>Case checklist</h2><p>Before you decide.</p></div></div>
+            <div class="d-flex flex-column gap-2 small-note">
+              <span><i class="bi bi-check2 text-brand"></i> Read the original booking description and offer messages.</span>
+              <span><i class="bi bi-check2 text-brand"></i> Check the timeline for delivery and payment timestamps.</span>
+              <span><i class="bi bi-check2 text-brand"></i> Review both parties' profiles and dispute history.</span>
+              <span><i class="bi bi-check2 text-brand"></i> Keep the resolution note factual — it is sent to both students.</span>
+            </div>
+            <div class="mini-escrow"><span>Booking reference</span><strong>{{ booking.reference }}</strong></div>
+            <div class="mini-escrow"><span>Case opened</span><strong>{{ dispute.created_at|date('%d %b %Y') }}</strong></div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

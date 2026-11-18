@@ -1,0 +1,32 @@
+{% from "partials/macros.html" import avatar %}
+<div class="messenger-inbox">
+  <div class="messenger-inbox-head">
+    <div class="d-flex align-items-center justify-content-between gap-2">
+      <h1>Messages</h1>
+      <span class="small-note">{{ items|length }} conversation{{ '' if items|length == 1 else 's' }}</span>
+    </div>
+  </div>
+  <div class="inbox-list">
+    {% for entry in items %}
+    <a class="inbox-item {{ 'unread' if entry.unread }} {{ 'active' if active_id is defined and active_id == entry.conversation.id }}" href="{{ url_for('messages.thread', conversation_id=entry.conversation.id) }}">
+      {{ avatar(entry.other, 'sm') }}
+      <div class="inbox-body">
+        <div class="inbox-top">
+          <strong>{{ entry.other.full_name }}</strong>
+          <span class="inbox-time">{% if entry.last %}{{ entry.last.created_at|datetime('%d %b') }}{% else %}{{ entry.conversation.created_at|date('%d %b') }}{% endif %}</span>
+        </div>
+        <div class="inbox-preview">
+          {% if entry.last %}{{ 'You: ' if entry.last.sender_id == current_user.id }}{{ entry.last.body|truncate(64) }}{% else %}Say hello to start the conversation{% endif %}
+        </div>
+      </div>
+      {% if entry.unread %}<span class="inbox-unread-dot" aria-label="{{ entry.unread }} unread message{{ '' if entry.unread == 1 else 's' }}"></span>{% endif %}
+    </a>
+    {% else %}
+    <div class="empty-state py-4 px-3">
+      <div class="empty-icon"><i class="bi bi-chat-dots"></i></div>
+      <h3>No messages yet</h3>
+      <p>Open a service or booking and use the message button to start a conversation.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>

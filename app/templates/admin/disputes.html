@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import status_badge, pagination_nav %}
+{% block title %}Disputes · Admin · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <div class="page-section">
+    <div class="container">
+      {% include "admin/_nav.html" %}
+
+      <div class="admin-head">
+        <div>
+          <h1>Disputes</h1>
+          <p>Investigate escrow disputes and decide whether funds are released or refunded.</p>
+        </div>
+        <span class="badge-soft badge-soft-danger">{{ open_count }} open</span>
+      </div>
+
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <div class="status-tabs">
+          <a class="{{ 'active' if state == 'open' }}" href="{{ url_for('admin.disputes', state='open') }}">Open <span class="count">{{ open_count }}</span></a>
+          <a class="{{ 'active' if state == 'resolved' }}" href="{{ url_for('admin.disputes', state='resolved') }}">Resolved</a>
+          <a class="{{ 'active' if state == 'all' }}" href="{{ url_for('admin.disputes', state='all') }}">All cases</a>
+        </div>
+      </div>
+
+      {% for dispute in disputes %}
+      <div class="dispute-card">
+        <span class="dispute-icon"><i class="bi {{ 'bi-exclamation-octagon' if dispute.status == 'open' else 'bi-check2-circle' }}"></i></span>
+        <div class="dispute-main">
+          <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+            <h3 class="mb-0"><a href="{{ url_for('admin.dispute_detail', dispute_id=dispute.id) }}">{{ dispute.booking.title }}</a></h3>
+            {{ status_badge(dispute.status_meta) }}
+          </div>
+          <p><strong>{{ dispute.reason }}</strong> — {{ dispute.details|truncate(160) }}</p>
+          <div class="dispute-meta">
+            <span><i class="bi bi-hash"></i>{{ dispute.booking.reference }}</span>
+            <span><i class="bi bi-person"></i> Opened by {{ dispute.opened_by.full_name }}</span>
+            <span><i class="bi bi-calendar3"></i>{{ dispute.created_at|datetime('%d %b %Y, %H:%M') }}</span>
+            <span><i class="bi bi-cash"></i>{{ dispute.booking.price|money }} · payment {{ dispute.booking.payment.status if dispute.booking.payment else 'unpaid' }}</span>
+          </div>
+        </div>
+        <div class="d-flex flex-column gap-2 align-items-end">
+          <a class="btn btn-brand btn-sm" href="{{ url_for('admin.dispute_detail', dispute_id=dispute.id) }}">{{ 'Review case' if dispute.status == 'open' else 'View outcome' }}</a>
+          <a class="btn btn-outline-ink btn-sm" href="{{ url_for('bookings.detail', booking_id=dispute.booking.id) }}">Open booking</a>
+        </div>
+      </div>
+      {% else %}
+      <div class="chart-card">
+        <div class="empty-state py-4">
+          <div class="empty-icon"><i class="bi bi-shield-check"></i></div>
+          <h3>{{ 'No open disputes' if state == 'open' else 'No disputes here' }}</h3>
+          <p>{{ 'Every escrow booking is progressing normally.' if state == 'open' else 'Cases will appear here once either party opens a dispute.' }}</p>
+        </div>
+      </div>
+      {% endfor %}
+
+      <div class="mt-4">{{ pagination_nav(pagination, 'Dispute pages') }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

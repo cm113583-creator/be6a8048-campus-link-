@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, verified_badge, provider_rating, status_badge %}
+{% block title %}{{ request_item.title }} · Requests · {{ APP_NAME }}{% endblock %}
+{% block content %}
+{% set item = request_item %}
+<div class="page-head">
+  <div class="container">
+    <div class="breadcrumbs">
+      <a href="{{ url_for('requests.index') }}">Requests</a><i class="bi bi-chevron-right"></i>
+      <span>{{ item.title|truncate(48) }}</span>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+      <span class="category-chip" style="--cat: {{ item.category.color }};"><i class="bi {{ item.category.icon }}"></i>{{ item.category.name }}</span>
+      {{ status_badge(item.status_meta) }}
+      {% if item.needed_by %}<span class="badge-soft badge-soft-secondary"><i class="bi bi-calendar3"></i> Needed by {{ item.needed_by|date('%d %b %Y') }}</span>{% endif %}
+    </div>
+    <h1>{{ item.title }}</h1>
+    <p>Posted by {{ item.seeker.full_name }} in {{ item.campus_area }} · budget up to {{ item.budget|money }} · {{ item.offer_count }} offer{{ '' if item.offer_count == 1 else 's' }}.</p>
+  </div>
+</div>
+
+<div class="page-section">
+  <div class="container">
+    <div class="request-detail-grid">
+      <div>
+        <div class="panel mb-4">
+          <div class="panel-head">
+            <div><h2>Request details</h2><p>Posted {{ item.created_at|datetime('%d %b %Y, %H:%M') }}</p></div>
+            {{ status_badge(item.status_meta) }}
+          </div>
+          <p class="request-description">{{ item.description }}</p>
+          <div class="booking-meta-grid mt-4">
+            <div class="booking-meta-item"><span>Budget guide</span><strong>{{ item.budget|money }}</strong></div>
+            <div class="booking-meta-item"><span>Category</span><strong>{{ item.category.name }}</strong></div>
+            <div class="booking-meta-item"><span>Campus area</span><strong>{{ item.campus_area }}</strong></div>
+            <div class="booking-meta-item"><span>Needed by</span><strong>{{ item.needed_by|date('%d %b %Y') if item.needed_by else 'Flexible' }}</strong></div>
+          </div>
+        </div>
+
+        {% if is_owner and item.booking %}
+        <div class="panel mb-4 d-flex align-items-start gap-3">
+          <span class="notification-icon"><i class="bi bi-calendar2-check"></i></span>
+          <div>
+            <strong>This request was awarded</strong>
+            <p class="small-note mb-2">A booking was created from the accepted offer.</p>
+            <a class="btn btn-brand btn-sm" href="{{ url_for('bookings.detail', booking_id=item.booking.id) }}">Open booking {{ item.booking.reference }}</a>
+          </div>
+        </div>
+        {% elif is_owner and item.status == 'closed' %}
+        <div class="panel mb-4 d-flex align-items-start gap-3">
+          <span class="notification-icon"><i class="bi bi-slash-circle"></i></span>
+          <div><strong>This request is closed</strong><p class="small-note mb-0">Providers can no longer send offers. Pending offers were declined automatically.</p></div>
+        </div>
+        {% endif %}
+
+        {% if my_offer %}
+        <div class="panel mb-4">
+          <div class="panel-head">
+            <div><h2>Your offer</h2><p>Sent {{ my_offer.created_at|datetime('%d %b %Y, %H:%M') }}.</p></div>
+            {{ status_badge(my_offer.status_meta) }}
+          </div>
+          <div class="offer-card">
+            <div class="offer-head">
+              <div class="offer-price">{{ my_offer.price|money }}</div>
+            </div>
+            <div class="offer-message">{{ my_offer.message }}</div>
+            <div class="offer-meta">
+              <span><i class="bi bi-calendar3"></i>{{ my_offer.proposed_at|datetime('%d %b %Y, %H:%M') }}</span>
+              <span><i class="bi bi-clock"></i>{{ my_offer.duration_minutes }} minutes</span>
+            </div>
+            {% if my_offer.booking or (my_offer.status == 'accepted' and item.booking) %}
+            <a class="btn btn-brand btn-sm" href="{{ url_for('bookings.detail', booking_id=(my_offer.booking or item.booking).id) }}"><i class="bi bi-calendar2-check"></i> View booking</a>
+            {% elif my_offer.status == 'pending' %}
+            <form method="post" action="{{ url_for('requests.withdraw_offer', request_id=item.id, offer_id=my_offer.id) }}" data-confirm="Withdraw your offer?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-outline-ink btn-sm" type="submit">Withdraw offer</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if is_owner or current_user.is_admin %}
+        <div class="panel mb-4">
+          <div class="panel-head">
+            <div><h2>Offers received</h2><p>Compare price, timing, and approach before awarding the request.</p></div>
+            <span class="badge-soft badge-soft-secondary">{{ offers|length }} offer{{ '' if offers|length == 1 else 's' }}</span>
+          </div>
+          {% if offers %}
+            {% for offer in offers %}
+            <article class="offer-card">
+              <div class="offer-head">
+                {{ avatar(offer.provider, 'sm') }}
+                <div class="min-w-0">
+                  <strong>{{ offer.provider.full_name }}</strong>
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    {{ verified_badge(offer.provider, compact=true) }}
+                    {{ provider_rating(offer.provider) }}
+                  </div>
+                </div>
+                <div class="offer-price">{{ offer.price|money }}</div>
+              </div>
+              <div class="offer-message">{{ offer.message }}</div>
+              <div class="offer-meta">
+                <span><i class="bi bi-calendar3"></i>{{ offer.proposed_at|datetime('%d %b %Y, %H:%M') }}</span>
+                <span><i class="bi bi-clock"></i>{{ offer.duration_minutes }} minutes</span>
+                <span><i class="bi bi-send"></i>{{ offer.created_at|date('%d %b') }}</span>
+                {{ status_badge(offer.status_meta) }}
+              </div>
+              <div class="offer-actions">
+                {% if is_owner and item.status == 'open' and offer.status == 'pending' %}
+                <form method="post" action="{{ url_for('requests.accept_offer', request_id=item.id, offer_id=offer.id) }}" data-confirm="Accept {{ offer.provider.full_name }}'s offer of {{ offer.price|money }}? A booking will be created and you will be asked to pay into escrow.">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                  <button class="btn btn-brand btn-sm" type="submit"><i class="bi bi-check2"></i> Accept offer</button>
+                </form>
+                {% endif %}
+                {% if offer.booking or (offer.status == 'accepted' and item.booking) %}
+                <a class="btn btn-outline-ink btn-sm" href="{{ url_for('bookings.detail', booking_id=(offer.booking or item.booking).id) }}">View booking</a>
+                {% endif %}
+                <a class="btn btn-ghost btn-sm" href="{{ url_for('main.profile', user_id=offer.provider.id) }}">Profile</a>
+                {% if current_user.is_admin and offer.status == 'pending' and item.status == 'open' %}
+                <span class="small-note align-self-center">Owned by {{ item.seeker.full_name }}</span>
+                {% endif %}
+              </div>
+            </article>
+            {% endfor %}
+          {% else %}
+          <div class="empty-state py-4">
+            <div class="empty-icon"><i class="bi bi-inbox"></i></div>
+            <h3>No offers yet</h3>
+            <p>Providers will appear here as soon as they respond. You can also share this request with a provider you trust.</p>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if can_offer and not (my_offer and my_offer.status == 'pending') %}
+        <div class="panel mb-4" id="offer">
+          <div class="panel-head">
+            <div><h2>{{ 'Send another offer' if my_offer else 'Send an offer' }}</h2><p>Pitch your price and time. The seeker compares every offer.</p></div>
+            <span class="badge-soft badge-soft-success">{{ item.budget|money }} budget</span>
+          </div>
+          <form method="post" action="{{ url_for('requests.make_offer', request_id=item.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row g-2">
+              <div class="col-md-4">
+                <label class="form-label" for="price">Your price (ZMW)</label>
+                <input class="form-control" id="price" name="price" type="number" min="1" max="100000" step="0.01" value="{{ my_offer.price if my_offer else '' }}" placeholder="e.g. 220" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="offer-date">Proposed date</label>
+                <input class="form-control" id="offer-date" name="date" type="date" min="{{ min_date }}" value="{{ my_offer.proposed_at.strftime('%Y-%m-%d') if my_offer else '' }}" required>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="offer-time">Start time</label>
+                <input class="form-control" id="offer-time" name="time" type="time" value="{{ my_offer.proposed_at.strftime('%H:%M') if my_offer else '' }}" required>
+              </div>
+            </div>
+            <div class="row g-2 mt-0">
+              <div class="col-md-6">
+                <label class="form-label" for="offer-duration">How long will it take?</label>
+                <select class="form-select" id="offer-duration" name="duration_minutes" required>
+                  {% for value, label in durations %}
+                  <option value="{{ value }}" {{ 'selected' if my_offer and my_offer.duration_minutes == value }}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Escrow note</label>
+                <div class="form-control d-flex align-items-center gap-2" style="background: var(--cream); color: var(--muted); font-size: 12px;"><i class="bi bi-shield-lock text-brand"></i> Paid only after delivery is confirmed</div>
+              </div>
+            </div>
+            <div class="mt-3">
+              <label class="form-label" for="offer-message">Your approach</label>
+              <textarea class="form-control" id="offer-message" name="message" rows="4" minlength="20" maxlength="1000" placeholder="Explain how you will do the work, what you will deliver, and any assumptions." required>{{ my_offer.message if my_offer else '' }}</textarea>
+              <div class="form-text">At least 20 characters. Specific offers win more work.</div>
+            </div>
+            <button class="btn btn-brand mt-3" type="submit"><i class="bi bi-send"></i> {{ 'Update offer' if my_offer else 'Send offer' }}</button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+
+      <aside class="request-side side-sticky">
+        <div class="budget-box">
+          <span class="budget-label">Seeker budget</span>
+          <div class="budget-amount">{{ item.budget|money }}</div>
+          <div class="budget-meta">
+            <span><i class="bi bi-geo-alt"></i>{{ item.campus_area }}</span>
+            <span><i class="bi bi-calendar3"></i>{{ 'Needed by ' + item.needed_by|date('%d %b %Y') if item.needed_by else 'Date flexible' }}</span>
+            <span><i class="bi bi-people"></i>{{ item.offer_count }} offer{{ '' if item.offer_count == 1 else 's' }} so far</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Posted by</h3>
+            {{ verified_badge(item.seeker) }}
+          </div>
+          <div class="people-row">
+            {{ avatar(item.seeker, 'md') }}
+            <div class="person-info">
+              <strong>{{ item.seeker.full_name }}</strong>
+              <span>{{ item.seeker.program or 'Cavendish student' }}{% if item.seeker.year_of_study %} · {{ item.seeker.year_of_study }}{% endif %}</span>
+            </div>
+          </div>
+          <div class="d-flex gap-2 mt-2">
+            <a class="btn btn-outline-ink btn-sm flex-grow-1" href="{{ url_for('main.profile', user_id=item.seeker.id) }}">Profile</a>
+            {% if not is_owner and not current_user.is_admin %}
+            <form method="post" action="{{ url_for('messages.start', user_id=item.seeker.id) }}" class="flex-grow-1">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-soft btn-sm w-100" type="submit"><i class="bi bi-chat-dots"></i> Message</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if is_owner and item.status == 'open' %}
+        <div class="panel">
+          <div class="panel-head"><h3>Manage request</h3></div>
+          <p class="small-note">Closing removes the request from the open board and declines any pending offers.</p>
+          <form method="post" action="{{ url_for('requests.close', request_id=item.id) }}" data-confirm="Close this request? Pending offers will be declined.">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-danger-soft w-100" type="submit"><i class="bi bi-slash-circle"></i> Close request</button>
+          </form>
+        </div>
+        {% endif %}
+
+        {% if can_offer and my_offer and my_offer.status == 'pending' %}
+        <div class="panel">
+          <div class="panel-head"><h3>Offer in review</h3>{{ status_badge(my_offer.status_meta) }}</div>
+          <p class="small-note mb-0">The seeker is comparing offers. You will be notified if yours is accepted — you can withdraw it any time before then.</p>
+        </div>
+        {% endif %}
+
+        <div class="panel">
+          <div class="panel-head"><h3>Safe contracting</h3><i class="bi bi-shield-check text-brand"></i></div>
+          <div class="d-flex flex-column gap-2 small-note">
+            <span><i class="bi bi-check2 text-brand"></i> Agree scope and deadline in the offer.</span>
+            <span><i class="bi bi-check2 text-brand"></i> Keep payments inside the escrow flow.</span>
+            <span><i class="bi bi-check2 text-brand"></i> Use messaging for questions before accepting.</span>
+            <span><i class="bi bi-check2 text-brand"></i> Disputes are reviewed by platform admins.</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+{% endblock %}

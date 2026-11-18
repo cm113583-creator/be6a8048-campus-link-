@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, status_badge, pagination_nav %}
+{% block title %}Listings · Admin · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <div class="page-section">
+    <div class="container">
+      {% include "admin/_nav.html" %}
+
+      <div class="admin-head">
+        <div>
+          <h1>Service listings</h1>
+          <p>Review published services, pause policy violations, and restore listings.</p>
+        </div>
+        <a class="btn btn-outline-ink btn-sm" href="{{ url_for('listings.browse') }}"><i class="bi bi-box-arrow-up-right"></i> Public browse</a>
+      </div>
+
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div class="status-tabs">
+          <a class="{{ 'active' if status == 'all' }}" href="{{ url_for('admin.listings', status='all', q=q) }}">All <span class="count">{{ counts.values()|sum }}</span></a>
+          <a class="{{ 'active' if status == 'active' }}" href="{{ url_for('admin.listings', status='active', q=q) }}">Live <span class="count">{{ counts.get('active', 0) }}</span></a>
+          <a class="{{ 'active' if status == 'paused' }}" href="{{ url_for('admin.listings', status='paused', q=q) }}">Paused <span class="count">{{ counts.get('paused', 0) }}</span></a>
+          <a class="{{ 'active' if status == 'suspended' }}" href="{{ url_for('admin.listings', status='suspended', q=q) }}">Suspended <span class="count">{{ counts.get('suspended', 0) }}</span></a>
+        </div>
+        <span class="small-note">{{ pagination.total }} listing{{ '' if pagination.total == 1 else 's' }}</span>
+      </div>
+
+      <form class="admin-filter" method="get" action="{{ url_for('admin.listings') }}">
+        <input type="hidden" name="status" value="{{ status }}">
+        <div class="search-field">
+          <i class="bi bi-search"></i>
+          <label class="sr-only" for="listing-search">Search listings</label>
+          <input class="form-control" id="listing-search" type="search" name="q" value="{{ q }}" placeholder="Search listing title or provider name">
+        </div>
+        <button class="btn btn-brand" type="submit">Search</button>
+        {% if q %}<a class="btn btn-ghost" href="{{ url_for('admin.listings', status=status) }}">Clear</a>{% endif %}
+      </form>
+
+      <div class="chart-card">
+        <div class="table-scroll">
+          <table class="site-table">
+            <thead>
+              <tr>
+                <th>Listing</th>
+                <th>Provider</th>
+                <th>Price</th>
+                <th>Area</th>
+                <th>Bookings</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for service in services %}
+              <tr>
+                <td>
+                  <span class="table-user">
+                    <span class="mini-thumb" style="--cat: {{ service.category.color }}; width: 34px; height: 34px; border-radius: 9px;"><i class="bi {{ service.category.icon }}"></i></span>
+                    <span>
+                      <strong>{{ service.title|truncate(38) }}</strong>
+                      <span>{{ service.category.name }}</span>
+                    </span>
+                  </span>
+                </td>
+                <td>
+                  <span class="table-user">
+                    {{ avatar(service.provider, 'xs') }}
+                    <span><strong>{{ service.provider.full_name }}</strong><span>{{ 'Verified' if service.provider.is_verified else 'Unverified' }}{% if service.provider.is_suspended %} · suspended{% endif %}</span></span>
+                  </span>
+                </td>
+                <td>{{ service.price|money }}<span class="small-note d-block">{{ service.price_unit }}</span></td>
+                <td><span class="small-note">{{ service.campus_area }}</span></td>
+                <td>{{ service.bookings.count() }}</td>
+                <td>{{ status_badge(service.status_meta) }}</td>
+                <td><span class="small-note">{{ service.created_at|date('%d %b %Y') }}</span></td>
+                <td>
+                  <div class="table-actions">
+                    <a class="btn btn-outline-ink" href="{{ url_for('listings.detail', service_id=service.id) }}">View</a>
+                    {% if service.status == 'suspended' %}
+                    <form method="post" action="{{ url_for('admin.restore_listing', service_id=service.id) }}" data-confirm="Restore “{{ service.title }}” to live?">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="btn btn-soft" type="submit">Restore</button>
+                    </form>
+                    {% else %}
+                    <form method="post" action="{{ url_for('admin.suspend_listing', service_id=service.id) }}" data-confirm="Suspend “{{ service.title }}”? It will be hidden from search.">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                      <button class="btn btn-danger-soft" type="submit">Suspend</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="8" class="table-empty">No listings match this filter.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="mt-4">{{ pagination_nav(pagination, 'Listing pages') }}</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

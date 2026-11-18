@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import request_card, pagination_nav %}
+{% block title %}Service requests · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="container">
+    <div class="breadcrumbs">
+      <a href="{{ url_for('main.dashboard') }}">Dashboard</a><i class="bi bi-chevron-right"></i>
+      <span>Requests</span>
+    </div>
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <h1>Student service requests</h1>
+        <p>See what students need and send a tailored offer. Seeker budgets are a guide — you set your own price and time.</p>
+      </div>
+      <div class="page-actions mt-0">
+        {% if not current_user.is_admin %}
+        <a class="btn btn-gold" href="{{ url_for('requests.create') }}"><i class="bi bi-plus-lg"></i> Post a request</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-section">
+  <div class="container">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+      <div class="status-tabs" aria-label="Request scope">
+        <a class="{{ 'active' if not mine }}" href="{{ url_for('requests.index', q=q, category=active_category.slug if active_category else '') }}">Open requests <span class="count">{{ open_count }}</span></a>
+        <a class="{{ 'active' if mine }}" href="{{ url_for('requests.index', mine='1', q=q, category=active_category.slug if active_category else '') }}">My requests <span class="count">{{ mine_count }}</span></a>
+      </div>
+      <span class="small-note">{{ pagination.total }} request{{ '' if pagination.total == 1 else 's' }}{% if q %} matching “{{ q }}”{% endif %}</span>
+    </div>
+
+    <form method="get" action="{{ url_for('requests.index') }}">
+      {% if mine %}<input type="hidden" name="mine" value="1">{% endif %}
+      <div class="browse-toolbar">
+        <div class="search-field">
+          <i class="bi bi-search"></i>
+          <label class="sr-only" for="request-search">Search requests</label>
+          <input class="form-control" id="request-search" type="search" name="q" value="{{ q }}" placeholder="Search requests by title or description">
+        </div>
+        <label class="sr-only" for="request-category">Category</label>
+        <select class="form-select" id="request-category" name="category" data-auto-submit>
+          <option value="">All categories</option>
+          {% for category in categories %}
+          <option value="{{ category.slug }}" {{ 'selected' if active_category and active_category.id == category.id }}>{{ category.name }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn btn-brand" type="submit"><i class="bi bi-search"></i> Search</button>
+        {% if q or active_category %}
+        <a class="btn btn-ghost" href="{{ url_for('requests.index', mine='1' if mine else '') }}">Reset</a>
+        {% endif %}
+      </div>
+    </form>
+
+    {% if q or active_category %}
+    <div class="active-filters mt-3">
+      {% if q %}<span class="active-filter">“{{ q }}” <a href="{{ url_for('requests.index', mine='1' if mine else '', category=active_category.slug if active_category else '') }}" aria-label="Remove search filter">×</a></span>{% endif %}
+      {% if active_category %}<span class="active-filter">{{ active_category.name }} <a href="{{ url_for('requests.index', mine='1' if mine else '', q=q) }}" aria-label="Remove category filter">×</a></span>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if requests %}
+    <div class="request-grid mt-4">
+      {% for item in requests %}{{ request_card(item) }}{% endfor %}
+    </div>
+    <div class="mt-4">{{ pagination_nav(pagination, 'Request pages') }}</div>
+    {% else %}
+    <div class="panel mt-4">
+      <div class="empty-state">
+        <div class="empty-icon"><i class="bi bi-megaphone"></i></div>
+        {% if mine %}
+        <h3>You have not posted any requests</h3>
+        <p>Describe what you need and let student providers send offers with their price and timing.</p>
+        {% if not current_user.is_admin %}<a class="btn btn-brand btn-sm" href="{{ url_for('requests.create') }}">Post a request</a>{% endif %}
+        {% elif q or active_category %}
+        <h3>No requests match your filters</h3>
+        <p>Try a broader search or a different category. New requests are posted throughout the week.</p>
+        <a class="btn btn-outline-brand btn-sm" href="{{ url_for('requests.index') }}">Clear filters</a>
+        {% else %}
+        <h3>No open requests right now</h3>
+        <p>Check back soon, or browse published services to find a provider directly.</p>
+        <a class="btn btn-brand btn-sm" href="{{ url_for('listings.browse') }}">Browse services</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

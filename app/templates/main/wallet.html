@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import pagination_nav %}
+{% block title %}Wallet · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="container">
+    <div class="breadcrumbs"><a href="{{ url_for('main.dashboard') }}">Dashboard</a><i class="bi bi-chevron-right"></i><span>Wallet</span></div>
+    <h1>Your demo wallet</h1>
+    <p>Top up simulated funds, pay into escrow, and track every movement in one ledger.</p>
+  </div>
+</div>
+<div class="page-section">
+  <div class="container">
+    <div class="wallet-layout">
+      <div>
+        <div class="wallet-hero mb-4">
+          <div class="label">Available balance</div>
+          <div class="amount">{{ current_user.wallet_balance|money }}</div>
+          <p>This is a demonstration wallet. No real mobile money or bank transaction takes place. Funds can be topped up instantly for testing.</p>
+          <div class="wallet-tags">
+            <span class="wallet-tag"><i class="bi bi-shield-lock"></i>Escrow protected</span>
+            <span class="wallet-tag"><i class="bi bi-currency-exchange"></i>Zambian Kwacha</span>
+            <span class="wallet-tag"><i class="bi bi-receipt"></i>Full transaction ledger</span>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <div><h2>Transaction history</h2><p>Newest first · {{ pagination.total }} entr{{ 'y' if pagination.total == 1 else 'ies' }}</p></div>
+            <span class="wallet-tag" style="background: var(--cream); color: var(--muted); border-color: var(--line);"><i class="bi bi-lock" style="color: var(--brand);"></i>Ledger balanced</span>
+          </div>
+          {% if transactions %}
+          <div class="txn-list">
+            {% for txn in transactions %}
+            {% set icon = 'bi-arrow-down-left' if txn.kind == 'top_up' else ('bi-shield-lock' if txn.kind == 'escrow_hold' else ('bi-cash-coin' if txn.kind == 'escrow_release' else 'bi-arrow-counterclockwise')) %}
+            <div class="txn-row">
+              <span class="txn-icon {{ 'credit' if txn.is_credit else 'debit' }}"><i class="bi {{ icon }}"></i></span>
+              <div class="txn-info">
+                <strong>{{ txn.description }}</strong>
+                <span>{{ txn.created_at|datetime('%d %b %Y, %H:%M') }}{% if txn.booking %} · {{ txn.booking.reference }}{% endif %}</span>
+              </div>
+              <div class="text-end">
+                <span class="txn-amount {{ 'credit' if txn.is_credit else 'debit' }}">{{ '+' if txn.is_credit else '−' }}{{ txn.amount|abs|money }}</span>
+                <span class="txn-balance">Bal. {{ txn.balance_after|money }}</span>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {{ pagination_nav(pagination, 'Wallet transactions') }}
+          {% else %}
+          <div class="empty-state py-4">
+            <div class="empty-icon"><i class="bi bi-wallet2"></i></div>
+            <h3>Your wallet is empty</h3>
+            <p>Top up a demo amount to start booking services or paying accepted offers.</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <aside class="side-stack">
+        <div class="panel">
+          <div class="panel-head"><div><h3>Top up demo wallet</h3><p>Instant and reversible — no real money.</p></div></div>
+          <div class="topup-presets">
+            <button class="topup-preset" type="button" data-topup="100">K100</button>
+            <button class="topup-preset" type="button" data-topup="250">K250</button>
+            <button class="topup-preset" type="button" data-topup="500">K500</button>
+            <button class="topup-preset" type="button" data-topup="1000">K1,000</button>
+          </div>
+          <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+            <label class="form-label" for="amount">Amount in ZMW</label>
+            <div class="input-group mb-3">
+              <span class="input-group-text">K</span>
+              <input class="form-control" id="amount" name="amount" type="number" min="1" max="20000" step="0.01" placeholder="0.00" required data-topup-input>
+            </div>
+            <button class="btn btn-brand w-100" type="submit"><i class="bi bi-plus-circle"></i> Add demo funds</button>
+          </form>
+          <p class="small-note mt-3 mb-0"><i class="bi bi-info-circle"></i> Maximum top-up is K20,000.00. This simulates mobile money integration, which is outside the project scope.</p>
+        </div>
+
+        <div class="panel panel-soft">
+          <div class="panel-head"><h3>How escrow works</h3><i class="bi bi-shield-check text-brand"></i></div>
+          <div class="mini-escrow"><span>1. You pay into escrow</span><span class="badge-soft badge-soft-info">Held</span></div>
+          <div class="mini-escrow"><span>2. Provider delivers the work</span><span class="badge-soft badge-soft-purple">Delivered</span></div>
+          <div class="mini-escrow"><span>3. You confirm completion</span><span class="badge-soft badge-soft-success">Released</span></div>
+          <p class="small-note mt-3 mb-0">If a job goes wrong, open a dispute before confirming. Funds stay held while an administrator reviews the case.</p>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head"><h3>Need help?</h3></div>
+          <p class="small-note">For payment or dispute questions, contact the platform administrator. Include your booking reference.</p>
+          <a class="btn btn-outline-ink btn-sm w-100" href="{{ url_for('bookings.index') }}">Review my bookings</a>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+{% endblock %}

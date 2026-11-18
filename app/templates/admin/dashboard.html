@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, status_badge, verified_badge %}
+{% block title %}Admin overview · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <div class="page-section">
+    <div class="container">
+      {% include "admin/_nav.html" %}
+
+      <div class="admin-head">
+        <div>
+          <h1>Platform overview</h1>
+          <p>Marketplace health, escrow exposure, and the moderation queue at a glance.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-outline-ink btn-sm" href="{{ url_for('admin.export_bookings') }}"><i class="bi bi-download"></i> Bookings CSV</a>
+          <a class="btn btn-brand btn-sm" href="{{ url_for('admin.reports') }}"><i class="bi bi-bar-chart"></i> Reports</a>
+        </div>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="metric-top">
+            <span class="metric-icon"><i class="bi bi-shield-lock"></i></span>
+            <span class="metric-trend"><i class="bi bi-lock"></i> In escrow</span>
+          </div>
+          <div class="metric-value">{{ escrow_held|money }}</div>
+          <div class="metric-label">Funds held across active bookings</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-top">
+            <span class="metric-icon" style="background: var(--blue-soft); color: var(--blue);"><i class="bi bi-graph-up-arrow"></i></span>
+          </div>
+          <div class="metric-value">{{ gmv|money }}</div>
+          <div class="metric-label">Released marketplace value</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-top">
+            <span class="metric-icon" style="background: var(--gold-soft); color: var(--gold-dark);"><i class="bi bi-cash-coin"></i></span>
+          </div>
+          <div class="metric-value">{{ fees|money }}</div>
+          <div class="metric-label">Platform fees earned (5%)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-top">
+            <span class="metric-icon" style="background: var(--danger-soft); color: var(--danger);"><i class="bi bi-flag"></i></span>
+            {% if dispute_queue %}<a class="metric-trend" href="{{ url_for('admin.disputes') }}">Review <i class="bi bi-arrow-right"></i></a>{% endif %}
+          </div>
+          <div class="metric-value">{{ dispute_queue|length }}</div>
+          <div class="metric-label">Open disputes awaiting a decision</div>
+        </div>
+      </div>
+
+      <div class="admin-grid mb-4">
+        <div class="chart-card">
+          <div class="chart-head">
+            <div><h2>Released revenue by month</h2><p>Escrow releases over the last six months.</p></div>
+            <span class="small-note">ZMW</span>
+          </div>
+          <div class="bar-chart">
+            {% for month in monthly %}
+            <div class="bar-col">
+              <span class="bar-value" title="{{ month.amount|money }}">{{ '{:,.0f}'.format(month.amount) }}</span>
+              <div class="bar-track"><div class="bar-fill" style="height: {{ month.percent }}%;"></div></div>
+              <span class="bar-label">{{ month.label }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-head">
+            <div><h2>Marketplace health</h2><p>Booking volume by status and platform reach.</p></div>
+          </div>
+          <div class="status-breakdown mb-3">
+            {% set dot_colors = {'warning': '#f4b740', 'info': '#7cb8dd', 'primary': '#1a9d74', 'purple': '#b493e8', 'success': '#1a9d74', 'secondary': '#8b9a92', 'danger': '#e2695c'} %}
+            {% for key, meta in booking_statuses.items() %}
+              {% if status_counts.get(key) %}
+              <span class="status-pill"><span class="dot" style="background: {{ dot_colors.get(meta.color, 'var(--muted)') }};"></span>{{ meta.label }} · {{ status_counts.get(key) }}</span>
+              {% endif %}
+            {% endfor %}
+            {% if not status_counts %}<span class="small-note">No bookings yet.</span>{% endif %}
+          </div>
+          <div class="mini-escrow"><span>Registered students</span><strong>{{ totals.students }}</strong></div>
+          <div class="mini-escrow"><span>Verified students</span><strong>{{ totals.verified }}</strong></div>
+          <div class="mini-escrow"><span>Live listings</span><strong>{{ totals.active_listings }}</strong></div>
+          <div class="mini-escrow"><span>Open service requests</span><strong>{{ totals.open_requests }}</strong></div>
+          <div class="mini-escrow"><span>Suspended accounts</span><strong>{{ totals.suspended }}</strong></div>
+        </div>
+      </div>
+
+      <div class="admin-grid-2 mb-4">
+        <div class="chart-card">
+          <div class="chart-head">
+            <div><h2>Recent bookings</h2><p>Newest requests and jobs across the platform.</p></div>
+            <a class="small-note" href="{{ url_for('bookings.index') }}">View all</a>
+          </div>
+          <div class="table-scroll">
+            <table class="site-table">
+              <thead><tr><th>Service</th><th>Parties</th><th>Amount</th><th>Status</th></tr></thead>
+              <tbody>
+                {% for booking in recent_bookings %}
+                <tr>
+                  <td><a href="{{ url_for('bookings.detail', booking_id=booking.id) }}"><strong>{{ booking.title|truncate(30) }}</strong></a><span class="small-note d-block">{{ booking.reference }}</span></td>
+                  <td><span class="small-note">{{ booking.seeker.full_name }} → {{ booking.provider.full_name }}</span></td>
+                  <td>{{ booking.price|money }}</td>
+                  <td>{{ status_badge(booking.status_meta) }}</td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="table-empty">No bookings yet.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-head">
+            <div><h2>Newest students</h2><p>Recent sign-ups and verification status.</p></div>
+            <a class="small-note" href="{{ url_for('admin.users') }}">Manage</a>
+          </div>
+          {% for user in recent_users %}
+          <div class="people-row">
+            {{ avatar(user, 'sm') }}
+            <div class="person-info">
+              <strong>{{ user.full_name }}{% if user.is_admin %} · admin{% endif %}</strong>
+              <span>{{ user.email }} · joined {{ user.created_at|date('%d %b') }}</span>
+            </div>
+            {% if user.is_suspended %}<span class="badge-soft badge-soft-danger">Suspended</span>
+            {% elif user.is_admin %}<span class="badge-soft badge-soft-secondary">Admin</span>
+            {% elif user.is_verified %}<span class="badge-soft badge-soft-success">Verified</span>
+            {% else %}<span class="badge-soft badge-soft-warning">Unverified</span>{% endif %}
+          </div>
+          {% else %}
+          <p class="small-note mb-0">No students yet.</p>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-head">
+          <div><h2>Dispute queue</h2><p>Oldest open cases first. Resolutions release or refund escrow.</p></div>
+          <a class="small-note" href="{{ url_for('admin.disputes', state='resolved') }}">Resolved cases</a>
+        </div>
+        {% for dispute in dispute_queue %}
+        <div class="dispute-card">
+          <span class="dispute-icon"><i class="bi bi-exclamation-octagon"></i></span>
+          <div class="dispute-main">
+            <h3>{{ dispute.booking.title }} · {{ dispute.booking.reference }}</h3>
+            <p>{{ dispute.reason }} — opened by {{ dispute.opened_by.full_name }} on {{ dispute.created_at|date('%d %b %Y') }}.</p>
+            <div class="dispute-meta">
+              <span><i class="bi bi-person"></i> Seeker: {{ dispute.booking.seeker.full_name }}</span>
+              <span><i class="bi bi-person-badge"></i> Provider: {{ dispute.booking.provider.full_name }}</span>
+              <span><i class="bi bi-cash"></i> {{ dispute.booking.price|money }} held</span>
+            </div>
+          </div>
+          <a class="btn btn-brand btn-sm" href="{{ url_for('admin.dispute_detail', dispute_id=dispute.id) }}">Review</a>
+        </div>
+        {% else %}
+        <div class="empty-state py-4">
+          <div class="empty-icon"><i class="bi bi-shield-check"></i></div>
+          <h3>No open disputes</h3>
+          <p>Every escrow booking is progressing without a case. New disputes appear here immediately.</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

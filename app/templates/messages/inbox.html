@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Messages · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="page-section">
+  <div class="container">
+    <div class="messenger">
+      {% set active_id = none %}
+      {% include "messages/_inbox.html" %}
+      <div class="messenger-thread">
+        <div class="thread-empty">
+          <i class="bi bi-chat-square-text"></i>
+          <h3 class="mb-2" style="font-size: 17px;">Your conversations</h3>
+          <p class="small-note" style="max-width: 300px;">Select a conversation to read and reply. Messages keep job details and agreements in one place.</p>
+          <a class="btn btn-brand btn-sm mt-2" href="{{ url_for('listings.browse') }}">Find a provider</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

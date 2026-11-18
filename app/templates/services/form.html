@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import field_error %}
+{% block title %}{{ 'Edit listing' if service else 'Offer a service' }} · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="container">
+    <div class="breadcrumbs"><a href="{{ url_for('main.dashboard') }}">Dashboard</a><i class="bi bi-chevron-right"></i><a href="{{ url_for('listings.my_services') }}">My services</a><i class="bi bi-chevron-right"></i><span>{{ 'Edit' if service else 'New listing' }}</span></div>
+    <h1>{{ 'Edit your listing' if service else 'Offer a service' }}</h1>
+    <p>A clear title, honest description, and realistic price help the right students find and book you.</p>
+  </div>
+</div>
+<div class="page-section">
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-lg-8">
+        <div class="panel">
+          <form method="post" novalidate>
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-section-title">Service basics</div>
+            <div class="mb-3">
+              <label class="form-label" for="title">Listing title</label>
+              <input class="form-control {{ 'is-invalid' if errors.get('title') }}" id="title" name="title" value="{{ form.title }}" maxlength="140" placeholder="e.g. Mathematics & statistics tutoring" required>
+              {{ field_error(errors, 'title') }}
+              <div class="form-text">Be specific. “Maths & statistics tutoring” works better than “Tutoring”.</div>
+            </div>
+            <div class="row g-3">
+              <div class="col-md-7">
+                <label class="form-label" for="category_id">Category</label>
+                <select class="form-select {{ 'is-invalid' if errors.get('category_id') }}" id="category_id" name="category_id" required>
+                  <option value="">Choose a category</option>
+                  {% for category in categories %}<option value="{{ category.id }}" {{ 'selected' if form.category_id == category.id|string }}>{{ category.name }}</option>{% endfor %}
+                </select>
+                {{ field_error(errors, 'category_id') }}
+              </div>
+              <div class="col-md-5">
+                <label class="form-label" for="campus_area">Campus area</label>
+                <select class="form-select {{ 'is-invalid' if errors.get('campus_area') }}" id="campus_area" name="campus_area" required>
+                  <option value="">Choose area</option>
+                  {% for area in CAMPUS_AREAS %}<option value="{{ area }}" {{ 'selected' if form.campus_area == area }}>{{ area }}</option>{% endfor %}
+                </select>
+                {{ field_error(errors, 'campus_area') }}
+              </div>
+            </div>
+            <div class="mt-3">
+              <label class="form-label" for="description">Description</label>
+              <textarea class="form-control {{ 'is-invalid' if errors.get('description') }}" id="description" name="description" rows="5" maxlength="3000" placeholder="What is included, who it is for, and how you work. Mention what the student should prepare." required>{{ form.description }}</textarea>
+              {{ field_error(errors, 'description') }}
+              <div class="form-text">At least 30 characters. Be transparent about scope so expectations are clear.</div>
+            </div>
+
+            <div class="form-section-title">Pricing and timing</div>
+            <div class="row g-3">
+              <div class="col-md-5">
+                <label class="form-label" for="price">Price (ZMW)</label>
+                <div class="input-group">
+                  <span class="input-group-text">K</span>
+                  <input class="form-control {{ 'is-invalid' if errors.get('price') }}" id="price" name="price" type="number" min="1" max="100000" step="0.01" value="{{ form.price }}" placeholder="0.00" required>
+                </div>
+                {{ field_error(errors, 'price') }}
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="price_unit">Charging unit</label>
+                <select class="form-select {{ 'is-invalid' if errors.get('price_unit') }}" id="price_unit" name="price_unit">
+                  {% for unit in price_units %}<option value="{{ unit }}" {{ 'selected' if form.price_unit == unit }}>{{ unit }}</option>{% endfor %}
+                </select>
+                {{ field_error(errors, 'price_unit') }}
+              </div>
+              <div class="col-md-3">
+                <label class="form-label" for="duration_minutes">Base duration</label>
+                <select class="form-select {{ 'is-invalid' if errors.get('duration_minutes') }}" id="duration_minutes" name="duration_minutes">
+                  {% for value, label in durations %}<option value="{{ value }}" {{ 'selected' if form.duration_minutes == value|string }}>{{ label }}</option>{% endfor %}
+                </select>
+                {{ field_error(errors, 'duration_minutes') }}
+              </div>
+            </div>
+            <div class="helper-note mt-3"><i class="bi bi-info-circle"></i><span>Hourly services are quoted automatically based on the session length chosen by the seeker. Per-task, per-session and per-day prices are fixed.</span></div>
+
+            <div class="form-section-title">Availability</div>
+            <div class="mb-3">
+              <label class="form-label d-block">Days you accept bookings</label>
+              <div class="day-picker">
+                {% for value, label, short in weekdays %}
+                <input type="checkbox" id="day-{{ value }}" name="available_days" value="{{ value }}" {{ 'checked' if value|string in form.available_days }}>
+                <label for="day-{{ value }}">{{ label }}</label>
+                {% endfor %}
+              </div>
+              {{ field_error(errors, 'available_days') }}
+            </div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label" for="available_from">Available from</label>
+                <input class="form-control {{ 'is-invalid' if errors.get('available_from') }}" id="available_from" name="available_from" type="time" value="{{ form.available_from }}" required>
+                {{ field_error(errors, 'available_from') }}
+              </div>
+              <div class="col-md-6">
+                <label class="form-label" for="available_to">Available until</label>
+                <input class="form-control {{ 'is-invalid' if errors.get('available_to') }}" id="available_to" name="available_to" type="time" value="{{ form.available_to }}" required>
+                {{ field_error(errors, 'available_to') }}
+              </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+              <button class="btn btn-brand" type="submit"><i class="bi bi-check2"></i>{{ 'Save changes' if service else 'Publish listing' }}</button>
+              <a class="btn btn-ghost" href="{{ url_for('listings.my_services') }}">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="panel mb-4">
+          <div class="panel-head"><h3>What makes a good listing</h3></div>
+          <div class="trust-list">
+            <div class="trust-item">
+              <span class="trust-ico"><i class="bi bi-pencil-square"></i></span>
+              <div><h4>Specific and honest</h4><p>State exactly what the student gets, and any limits on revisions or scope.</p></div>
+            </div>
+            <div class="trust-item">
+              <span class="trust-ico"><i class="bi bi-cash-coin"></i></span>
+              <div><h4>Price to be accepted</h4><p>Compare similar campus listings. Clear pricing reduces negotiation back-and-forth.</p></div>
+            </div>
+            <div class="trust-item">
+              <span class="trust-ico"><i class="bi bi-calendar2-week"></i></span>
+              <div><h4>Realistic availability</h4><p>Only select times you can genuinely meet. Conflicts are blocked automatically.</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="panel panel-soft">
+          <div class="panel-head"><h3>How you get paid</h3><i class="bi bi-shield-check text-brand"></i></div>
+          <p class="small-note">The seeker pays into escrow when you accept a booking. Confirm delivery in the app, then the seeker releases the funds to your demo wallet minus a 5% platform fee.</p>
+          <div class="mini-escrow"><span>Held during the job</span><strong>100%</strong></div>
+          <div class="mini-escrow"><span>Released on confirmation</span><strong>95%</strong></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

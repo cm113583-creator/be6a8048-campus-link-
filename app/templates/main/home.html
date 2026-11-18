@@ -1,0 +1,263 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import service_card, request_card, avatar, rating_stars, verified_badge %}
+{% block title %}{{ APP_NAME }} — {{ APP_TAGLINE }}{% endblock %}
+{% block content %}
+{% set hero_service = featured[0] if featured else None %}
+
+<section class="hero">
+  <div class="container">
+    <div class="hero-inner">
+      <div class="hero-copy">
+        <span class="eyebrow"><span class="dot"></span>Cavendish University Zambia</span>
+        <h1>Campus skills.<br><span class="highlight">Trusted trade.</span></h1>
+        <p class="lead">Find a tutor, photographer, designer or helping hand on your campus. Book student providers, pay safely into escrow, and build trust one completed job at a time.</p>
+        <form class="hero-search" method="get" action="{{ url_for('listings.browse') }}" role="search">
+          <i class="bi bi-search" aria-hidden="true"></i>
+          <label class="sr-only" for="hero-search-input">Search campus services</label>
+          <input id="hero-search-input" type="search" name="q" placeholder="Try “maths tutor”, “event photography” or “laptop repair”">
+          <button class="btn btn-brand" type="submit">Search</button>
+        </form>
+        <div class="popular-links">
+          <span>Popular:</span>
+          <a href="{{ url_for('listings.browse', category='tutoring') }}">Tutoring</a>
+          <a href="{{ url_for('listings.browse', category='photography') }}">Photography</a>
+          <a href="{{ url_for('listings.browse', category='graphic-design') }}">Design</a>
+          <a href="{{ url_for('listings.browse', category='technical-support') }}">Tech help</a>
+        </div>
+        <div class="hero-stats">
+          <div class="hero-stat"><strong>{{ live_listings }}</strong><span>live services</span></div>
+          <div class="hero-stat"><strong>{{ verified_providers }}</strong><span>verified providers</span></div>
+          <div class="hero-stat"><strong>{{ completed }}<span class="stat-plus">+</span></strong><span>jobs completed</span></div>
+        </div>
+      </div>
+
+      <div class="hero-art" aria-hidden="true">
+        {% if hero_service %}
+        <div class="hero-demo-card">
+          <div class="demo-cover" style="--cat: {{ hero_service.category.color }};">
+            <span class="demo-cat">{{ hero_service.category.name }}</span>
+            <span class="demo-icon"><i class="bi {{ hero_service.category.icon }}"></i></span>
+          </div>
+          <div class="demo-body">
+            <div class="demo-provider">
+              {{ avatar(hero_service.provider, 'xs') }}
+              <span class="demo-name">{{ hero_service.provider.full_name }}</span>
+              {{ rating_stars(hero_service.provider.rating_avg) }}
+            </div>
+            <div class="demo-title">{{ hero_service.title }}</div>
+            <div class="demo-foot">
+              <span class="demo-price">{{ hero_service.price|money }} <span>/ {{ hero_service.price_unit|replace('per ', '') }}</span></span>
+              <span><i class="bi bi-geo-alt"></i> {{ hero_service.campus_area }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="float-card float-escrow">
+          <span class="float-icon"><i class="bi bi-shield-check"></i></span>
+          <div><strong>K{{ '%.2f'|format((hero_service.price|float) * 0.95) }} held safely</strong>Released only after you confirm delivery.</div>
+        </div>
+        {% endif %}
+        <div class="float-card float-review">
+          <span class="float-icon"><i class="bi bi-star-fill"></i></span>
+          <div>
+            <div class="rating">{% for i in range(5) %}<i class="bi bi-star-fill"></i>{% endfor %}</div>
+            <p>“Clear pricing, on time, and a proper review history. This is how campus work should feel.”</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="categories">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">What students offer</span>
+        <h2>Everyday needs, <br class="d-none d-md-block">student-sized solutions.</h2>
+        <p>From last-minute proofreading to event photography, browse services priced and delivered by people on your campus.</p>
+      </div>
+      <a class="section-link" href="{{ url_for('listings.browse') }}">Browse all services <i class="bi bi-arrow-right"></i></a>
+    </div>
+    <div class="category-grid">
+      {% for category in categories %}
+      <a class="category-card" href="{{ url_for('listings.browse', category=category.slug) }}">
+        <span class="category-icon" style="--cat: {{ category.color }};"><i class="bi {{ category.icon }}"></i></span>
+        <span class="category-info">
+          <h3>{{ category.name }}</h3>
+          <span>{{ category_counts.get(category.id, 0) }} active listing{{ '' if category_counts.get(category.id, 0) == 1 else 's' }}</span>
+        </span>
+        <i class="bi bi-arrow-up-right"></i>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if featured %}
+<section class="section section-white">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Trusted right now</span>
+        <h2>Featured student services</h2>
+        <p>Providers with verified accounts and strong completion records, chosen for quality and reliability.</p>
+      </div>
+      <a class="section-link" href="{{ url_for('listings.browse', sort='rating') }}">Top rated <i class="bi bi-arrow-right"></i></a>
+    </div>
+    <div class="service-grid">
+      {% for service in featured %}{{ service_card(service) }}{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="section" id="how-it-works">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Simple by design</span>
+        <h2>From “I need help” to “job done”.</h2>
+        <p>A clear process with protections at every step. No cash handovers, no chasing strangers in group chats.</p>
+      </div>
+      {% if not current_user.is_authenticated %}
+      <a class="section-link" href="{{ url_for('auth.register') }}">Create a free account <i class="bi bi-arrow-right"></i></a>
+      {% endif %}
+    </div>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-num">01</div>
+        <div class="step-icon"><i class="bi bi-search"></i></div>
+        <h3>Find or request</h3>
+        <p>Browse listings by category, price and campus area. Or post a request and let providers send you offers.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">02</div>
+        <div class="step-icon"><i class="bi bi-calendar2-check"></i></div>
+        <h3>Book and pay safely</h3>
+        <p>Agree a time, then pay into escrow from your demo wallet. The provider knows the funds are secured.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">03</div>
+        <div class="step-icon"><i class="bi bi-star"></i></div>
+        <h3>Confirm and review</h3>
+        <p>Only release payment once you are satisfied. Leave a multidimensional review that builds real reputation.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section section-white" id="trust">
+  <div class="container">
+    <div class="trust-layout">
+      <div class="trust-copy">
+        <span class="eyebrow">Trust built into the platform</span>
+        <h2>Confidence before, during, and after every job.</h2>
+        <p>Informal campus work runs on hope. CampusLink replaces that with escrow, verified identities, visible histories, and a fair dispute process.</p>
+        <div class="trust-list">
+          <div class="trust-item">
+            <span class="trust-ico"><i class="bi bi-shield-lock"></i></span>
+            <div><h4>Escrow-protected payments</h4><p>Your money is held until you confirm the service was delivered. If something goes wrong, an administrator can step in.</p></div>
+          </div>
+          <div class="trust-item">
+            <span class="trust-ico"><i class="bi bi-patch-check"></i></span>
+            <div><h4>Verified student accounts</h4><p>Administrators verify student numbers, so you know you are dealing with a real member of the campus community.</p></div>
+          </div>
+          <div class="trust-item">
+            <span class="trust-ico"><i class="bi bi-graph-up-arrow"></i></span>
+            <div><h4>Reputation that is earned</h4><p>Ratings combine quality, timeliness, communication, completion rate and real transaction history — not just stars.</p></div>
+          </div>
+          <div class="trust-item">
+            <span class="trust-ico"><i class="bi bi-chat-dots"></i></span>
+            <div><h4>Accountable conversations</h4><p>Messaging stays inside the platform, giving both sides a record of what was agreed.</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="escrow-visual">
+        <div class="mini-head">Escrow example</div>
+        <div class="escrow-card">
+          <div class="escrow-row"><span>Design project</span><span class="badge-soft badge-soft-success">In progress</span></div>
+          <div class="escrow-amount">K450.00</div>
+          <div class="escrow-bar"><span class="on"></span><span class="on"></span><span></span><span></span></div>
+          <div class="escrow-status"><span class="dot"></span> Funds held securely · not yet released</div>
+          <div class="escrow-row mt-3"><span>Provider receives</span><strong>K427.50</strong></div>
+          <div class="escrow-row"><span>Platform fee (5%)</span><strong>K22.50</strong></div>
+          <div class="escrow-foot">The provider is paid only after the seeker confirms delivery, or after an administrator resolves a dispute.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% if recent_requests %}
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Open opportunities</span>
+        <h2>Fresh requests from students</h2>
+        <p>Have the right skill? Send an offer and agree the details directly.</p>
+      </div>
+      {% if current_user.is_authenticated %}
+      <a class="section-link" href="{{ url_for('requests.index') }}">See all requests <i class="bi bi-arrow-right"></i></a>
+      {% else %}
+      <a class="section-link" href="{{ url_for('auth.login', next=url_for('requests.index')) }}">Log in to respond <i class="bi bi-arrow-right"></i></a>
+      {% endif %}
+    </div>
+    <div class="request-grid">
+      {% for item in recent_requests %}{{ request_card(item) }}{% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% if testimonials %}
+<section class="section section-white" id="reviews">
+  <div class="container">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">Real feedback</span>
+        <h2>Reviews from completed work</h2>
+        <p>Every review on CampusLink is tied to a booking that actually took place.</p>
+      </div>
+    </div>
+    <div class="testimonial-grid">
+      {% for review in testimonials %}
+      <article class="testimonial-card">
+        {{ rating_stars(review.overall, size='sm') }}
+        <blockquote>“{{ review.comment|truncate(180) }}”</blockquote>
+        <div class="testimonial-person">
+          {{ avatar(review.author, 'sm') }}
+          <div><strong>{{ review.author.full_name }}</strong><span>{{ review.author.program or 'Student' }}</span></div>
+          <span class="provider-credit"><i class="bi bi-arrow-right"></i> {{ review.provider.full_name }}</span>
+        </div>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="section">
+  <div class="container">
+    <div class="cta-band">
+      <div>
+        <span class="eyebrow"><span class="dot"></span>Built for the Cavendish community</span>
+        <h2>Your next client is already on campus.</h2>
+        <p>Create a listing, showcase your skills, and let escrow and reviews do the trust-building for you.</p>
+      </div>
+      <div class="cta-actions">
+        {% if current_user.is_authenticated %}
+          {% if not current_user.is_admin %}
+          <a class="btn btn-gold btn-lg" href="{{ url_for('listings.create') }}">Offer a service <i class="bi bi-arrow-up-right"></i></a>
+          {% endif %}
+          <a class="btn btn-outline-light btn-lg" href="{{ url_for('requests.index') }}">Browse requests</a>
+        {% else %}
+        <a class="btn btn-gold btn-lg" href="{{ url_for('auth.register') }}">Join CampusLink <i class="bi bi-arrow-right"></i></a>
+        <a class="btn btn-outline-light btn-lg" href="{{ url_for('listings.browse') }}">Browse first</a>
+        {% endif %}
+        <span class="cta-note">Demo platform · no real money is processed</span>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

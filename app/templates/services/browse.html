@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import service_card, pagination_nav %}
+{% block title %}Browse services · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="container">
+    <div class="breadcrumbs"><a href="{{ url_for('main.home') }}">Home</a><i class="bi bi-chevron-right"></i><span>Services</span></div>
+    <h1>Browse campus services</h1>
+    <p>Compare student providers by price, rating, campus area, and availability. Every booking is protected by escrow.</p>
+  </div>
+</div>
+<div class="page-section">
+  <div class="container">
+    <form method="get" action="{{ url_for('listings.browse') }}">
+      <div class="browse-toolbar">
+        <div class="search-field">
+          <i class="bi bi-search"></i>
+          <label class="sr-only" for="services-search">Search services</label>
+          <input class="form-control" id="services-search" type="search" name="q" value="{{ q }}" placeholder="Search by service, provider or category">
+        </div>
+        <label class="sr-only" for="area-filter">Campus area</label>
+        <select class="form-select" id="area-filter" name="area" data-auto-submit>
+          <option value="">All campus areas</option>
+          {% for option in CAMPUS_AREAS %}<option value="{{ option }}" {{ 'selected' if area == option }}>{{ option }}</option>{% endfor %}
+        </select>
+        <label class="sr-only" for="sort-filter">Sort by</label>
+        <select class="form-select" id="sort-filter" name="sort" data-auto-submit>
+          <option value="recommended" {{ 'selected' if sort == 'recommended' }}>Recommended</option>
+          <option value="rating" {{ 'selected' if sort == 'rating' }}>Highest rated</option>
+          <option value="price_low" {{ 'selected' if sort == 'price_low' }}>Price: low to high</option>
+          <option value="price_high" {{ 'selected' if sort == 'price_high' }}>Price: high to low</option>
+          <option value="newest" {{ 'selected' if sort == 'newest' }}>Newest listings</option>
+        </select>
+        <button class="btn btn-brand" type="submit"><i class="bi bi-search"></i> Search</button>
+        <button class="btn btn-outline-ink mobile-filter-toggle" type="button" data-filter-toggle><i class="bi bi-sliders"></i> Filters</button>
+      </div>
+
+      <div class="browse-layout mt-4">
+        <aside class="filter-panel">
+          <div class="filter-group">
+            <h3>Categories</h3>
+            <div class="filter-cats">
+              <a class="{{ 'active' if not active_category }}" href="{{ url_for('listings.browse', q=q, area=area, min_price=min_price, max_price=max_price, rating=rating, sort=sort) }}"><i class="bi bi-grid"></i>All services</a>
+              {% for category in categories %}
+              <a class="{{ 'active' if active_category and active_category.id == category.id }}" href="{{ url_for('listings.browse', category=category.slug, q=q, area=area, min_price=min_price, max_price=max_price, rating=rating, sort=sort) }}"><i class="bi {{ category.icon }}"></i>{{ category.name }}</a>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="filter-group">
+            <h3>Price range</h3>
+            <div class="price-row">
+              <input class="form-control form-control-sm" type="number" name="min_price" value="{{ min_price }}" min="0" step="1" placeholder="Min" aria-label="Minimum price">
+              <span>to</span>
+              <input class="form-control form-control-sm" type="number" name="max_price" value="{{ max_price }}" min="0" step="1" placeholder="Max" aria-label="Maximum price">
+            </div>
+          </div>
+          <div class="filter-group">
+            <h3>Minimum rating</h3>
+            <div class="rating-options">
+              {% for value, label in [(0, 'Any rating'), (3, '3 stars & up'), (4, '4 stars & up'), (5, '5 stars only')] %}
+              <label><input class="form-check-input" type="radio" name="rating" value="{{ value if value else '' }}" {{ 'checked' if (rating or 0) == value }}> {{ label }}</label>
+              {% endfor %}
+            </div>
+          </div>
+          <button class="btn btn-brand w-100" type="submit">Apply filters</button>
+          <a class="btn btn-ghost w-100 mt-2" href="{{ url_for('listings.browse') }}">Reset</a>
+        </aside>
+
+        <div>
+          <div class="results-head">
+            <div>
+              <h2>{{ active_category.name if active_category else 'All services' }}</h2>
+              <span class="result-count">{{ pagination.total }} result{{ '' if pagination.total == 1 else 's' }}{% if q %} for “{{ q }}”{% endif %}</span>
+            </div>
+          </div>
+
+          {% if q or active_category or area or min_price or max_price or rating %}
+          <div class="active-filters">
+            {% if q %}<span class="active-filter">“{{ q }}” <a href="{{ url_for('listings.browse', category=active_category.slug if active_category else '', area=area, min_price=min_price, max_price=max_price, rating=rating, sort=sort) }}" aria-label="Remove search filter">×</a></span>{% endif %}
+            {% if active_category %}<span class="active-filter">{{ active_category.name }} <a href="{{ url_for('listings.browse', q=q, area=area, min_price=min_price, max_price=max_price, rating=rating, sort=sort) }}" aria-label="Remove category filter">×</a></span>{% endif %}
+            {% if area %}<span class="active-filter">{{ area }} <a href="{{ url_for('listings.browse', q=q, category=active_category.slug if active_category else '', min_price=min_price, max_price=max_price, rating=rating, sort=sort) }}" aria-label="Remove area filter">×</a></span>{% endif %}
+            {% if min_price or max_price %}<span class="active-filter">K{{ min_price or '0' }}–{{ 'K' + max_price if max_price else 'any' }} <a href="{{ url_for('listings.browse', q=q, category=active_category.slug if active_category else '', area=area, rating=rating, sort=sort) }}" aria-label="Remove price filter">×</a></span>{% endif %}
+            {% if rating %}<span class="active-filter">{{ rating }}★ & up <a href="{{ url_for('listings.browse', q=q, category=active_category.slug if active_category else '', area=area, min_price=min_price, max_price=max_price, sort=sort) }}" aria-label="Remove rating filter">×</a></span>{% endif %}
+          </div>
+          {% endif %}
+
+          {% if services %}
+          <div class="service-grid">
+            {% for service in services %}{{ service_card(service) }}{% endfor %}
+          </div>
+          {{ pagination_nav(pagination, 'Services') }}
+          {% else %}
+          <div class="empty-state">
+            <div class="empty-icon"><i class="bi bi-search"></i></div>
+            <h3>No services match your filters</h3>
+            <p>Try a broader search, a different campus area, or a higher price range.</p>
+            <a class="btn btn-outline-brand" href="{{ url_for('listings.browse') }}">Clear all filters</a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

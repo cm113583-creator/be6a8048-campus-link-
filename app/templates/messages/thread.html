@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, verified_badge %}
+{% block title %}Chat with {{ other.full_name }} · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="page-section">
+  <div class="container">
+    <div class="messenger">
+      {% set active_id = conversation.id %}
+      {% include "messages/_inbox.html" %}
+      <div class="messenger-thread">
+        <div class="thread-head">
+          {{ avatar(other, 'sm') }}
+          <div class="thread-head-info">
+            <strong>{{ other.full_name }}</strong>
+            <span>{{ other.program or 'Cavendish student' }}{% if other.year_of_study %} · {{ other.year_of_study }}{% endif %}</span>
+          </div>
+          {{ verified_badge(other, compact=true) }}
+          <a class="btn btn-outline-ink btn-sm" href="{{ url_for('main.profile', user_id=other.id) }}">Profile</a>
+        </div>
+        <div class="thread-body">
+          {% for message in messages %}
+          <div class="message-bubble {{ 'mine' if message.sender_id == current_user.id }}">
+            {{ message.body|nl2br }}
+            <span class="message-time">{{ message.created_at|datetime('%d %b, %H:%M') }}{% if message.sender_id == current_user.id %} · You{% endif %}</span>
+          </div>
+          {% else %}
+          <div class="thread-empty">
+            <i class="bi bi-chat-heart"></i>
+            <h3 class="mb-2" style="font-size: 16px;">Start the conversation</h3>
+            <p class="small-note" style="max-width: 320px;">Introduce yourself and share what you need. Keep scope, timing, and pricing in writing so both sides have a record.</p>
+          </div>
+          {% endfor %}
+          <div id="latest"></div>
+        </div>
+        <div class="thread-composer">
+          <form method="post" action="{{ url_for('messages.thread', conversation_id=conversation.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="sr-only" for="message-body">Message</label>
+            <textarea class="form-control" id="message-body" name="body" rows="1" maxlength="2000" placeholder="Write a message…" required autofocus></textarea>
+            <button class="btn btn-brand" type="submit" aria-label="Send message"><i class="bi bi-send"></i></button>
+          </form>
+          <div class="small-note mt-1 px-1">Messages are visible to you and {{ other.first_name }} only. Never share passwords or bank details.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

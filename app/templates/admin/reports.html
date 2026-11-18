@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, verified_badge %}
+{% block title %}Reports · Admin · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="admin-page">
+  <div class="page-section">
+    <div class="container">
+      {% include "admin/_nav.html" %}
+
+      <div class="admin-head">
+        <div>
+          <h1>Reports</h1>
+          <p>Marketplace performance for the selected period, with downloadable data.</p>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-outline-ink btn-sm" href="{{ url_for('admin.export_bookings') }}" download><i class="bi bi-file-earmark-spreadsheet"></i> Bookings CSV</a>
+          <a class="btn btn-outline-ink btn-sm" href="{{ url_for('admin.export_users') }}" download><i class="bi bi-file-earmark-people"></i> Students CSV</a>
+        </div>
+      </div>
+
+      <div class="report-period">
+        <a class="{{ 'active' if days == 30 }}" href="{{ url_for('admin.reports', days=30) }}">30 days</a>
+        <a class="{{ 'active' if days == 90 }}" href="{{ url_for('admin.reports', days=90) }}">90 days</a>
+        <a class="{{ 'active' if days == 365 }}" href="{{ url_for('admin.reports', days=365) }}">12 months</a>
+        <a class="{{ 'active' if days == 0 }}" href="{{ url_for('admin.reports', days=0) }}">All time</a>
+      </div>
+
+      <div class="metric-grid">
+        <div class="metric-card">
+          <div class="metric-top"><span class="metric-icon"><i class="bi bi-graph-up-arrow"></i></span></div>
+          <div class="metric-value">{{ stats.gmv|money }}</div>
+          <div class="metric-label">Released marketplace value{% if days %} · last {{ days }} days{% endif %}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-top"><span class="metric-icon" style="background: var(--gold-soft); color: var(--gold-dark);"><i class="bi bi-cash-coin"></i></span></div>
+          <div class="metric-value">{{ stats.fees|money }}</div>
+          <div class="metric-label">Platform fees earned</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-top"><span class="metric-icon" style="background: var(--blue-soft); color: var(--blue);"><i class="bi bi-shield-lock"></i></span></div>
+          <div class="metric-value">{{ stats.held|money }}</div>
+          <div class="metric-label">Currently held in escrow</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-top"><span class="metric-icon"><i class="bi bi-check2-circle"></i></span></div>
+          <div class="metric-value">{{ stats.completed }}</div>
+          <div class="metric-label">Completed bookings</div>
+        </div>
+      </div>
+
+      <div class="admin-grid-2 mb-4">
+        <div class="chart-card">
+          <div class="chart-head">
+            <div><h2>Escrow releases</h2><p>Value released per month over the last six months.</p></div>
+          </div>
+          <div class="bar-chart">
+            {% for month in monthly %}
+            <div class="bar-col">
+              <span class="bar-value" title="{{ month.amount|money }}">{{ '{:,.0f}'.format(month.amount) }}</span>
+              <div class="bar-track"><div class="bar-fill gold" style="height: {{ month.percent }}%;"></div></div>
+              <span class="bar-label">{{ month.label }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-head">
+            <div><h2>Period summary</h2><p>Activity within the selected window.</p></div>
+          </div>
+          <div class="mini-escrow"><span>Released payments</span><strong>{{ stats.released }}</strong></div>
+          <div class="mini-escrow"><span>Average released value</span><strong>{{ stats.avg_value|money }}</strong></div>
+          <div class="mini-escrow"><span>New students</span><strong>{{ stats.new_users }}</strong></div>
+          <div class="mini-escrow"><span>Escrow still held</span><strong>{{ stats.held|money }}</strong></div>
+          <div class="status-breakdown mt-3">
+            {% set dot_colors = {'warning': '#f4b740', 'info': '#7cb8dd', 'primary': '#1a9d74', 'purple': '#b493e8', 'success': '#1a9d74', 'secondary': '#8b9a92', 'danger': '#e2695c'} %}
+            {% for key, meta in booking_statuses.items() %}
+              {% if status_counts.get(key) %}
+              <span class="status-pill"><span class="dot" style="background: {{ dot_colors.get(meta.color, 'var(--muted)') }};"></span>{{ meta.label }} · {{ status_counts.get(key) }}</span>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-grid">
+        <div class="chart-card">
+          <div class="chart-head">
+            <div><h2>Category performance</h2><p>Completed booking value by category.</p></div>
+            <span class="small-note">{{ categories|length }} categor{{ 'y' if categories|length == 1 else 'ies' }}</span>
+          </div>
+          {% if categories %}
+          <div class="hbar-list">
+            {% for category in categories %}
+            <div class="hbar-row">
+              <div class="hbar-top">
+                <span>{{ category.name }} · {{ category.jobs }} job{{ '' if category.jobs == 1 else 's' }}</span>
+                <span>{{ category.revenue|money }}</span>
+              </div>
+              <div class="hbar-track"><div class="hbar-fill" style="width: {{ category.percent }}%; background: {{ category.color }};"></div></div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="small-note mb-0">No completed bookings in this period.</p>
+          {% endif %}
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-head">
+            <div><h2>Top providers</h2><p>Most completed bookings in the period.</p></div>
+            <a class="small-note" href="{{ url_for('admin.users', state='verified') }}">Manage students</a>
+          </div>
+          {% if top_providers %}
+          <div class="table-scroll">
+            <table class="site-table">
+              <thead><tr><th>Provider</th><th>Jobs</th><th>Value</th></tr></thead>
+              <tbody>
+                {% for provider, jobs, earned in top_providers %}
+                <tr>
+                  <td>
+                    <a class="table-user" href="{{ url_for('main.profile', user_id=provider.id) }}">
+                      {{ avatar(provider, 'xs') }}
+                      <span><strong>{{ provider.full_name }}</strong><span>{{ provider.program or 'Student provider' }}</span></span>
+                    </a>
+                  </td>
+                  <td>{{ jobs }}</td>
+                  <td>{{ earned|money }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="small-note mb-0">No completed provider jobs in this period.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="chart-card mt-4">
+        <div class="chart-head">
+          <div><h2>Export data</h2><p>Download raw records for the dissertation appendix or offline analysis.</p></div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-brand" href="{{ url_for('admin.export_bookings') }}" download><i class="bi bi-download"></i> Bookings &amp; escrow CSV</a>
+          <a class="btn btn-outline-brand" href="{{ url_for('admin.export_users') }}" download><i class="bi bi-download"></i> Students CSV</a>
+        </div>
+        <p class="small-note mt-3 mb-0">CSV exports include all records (not just the selected period) and are UTF-8 encoded with a BOM for Excel compatibility.</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

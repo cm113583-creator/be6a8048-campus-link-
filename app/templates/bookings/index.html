@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, booking_card, status_badge, pagination_nav %}
+{% block title %}Bookings · {{ APP_NAME }}{% endblock %}
+{% block content %}
+{% set active_count = counts.get('pending', 0) + counts.get('accepted', 0) + counts.get('in_escrow', 0) + counts.get('delivered', 0) + counts.get('disputed', 0) %}
+{% set total_count = counts.values() | sum %}
+{% set history_count = total_count - active_count %}
+
+<div class="page-head">
+  <div class="container">
+    <div class="breadcrumbs">
+      <a href="{{ url_for('main.dashboard') }}">Dashboard</a><i class="bi bi-chevron-right"></i>
+      <span>Bookings</span>
+    </div>
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <h1>{{ 'All bookings' if current_user.is_admin else 'My bookings' }}</h1>
+        <p>{{ 'Every booking across the platform, including escrow and dispute status.' if current_user.is_admin else 'Track requests, escrow payments, deliveries, and completed jobs in one place.' }}</p>
+      </div>
+      <div class="page-actions mt-0">
+        {% if not current_user.is_admin %}
+        <a class="btn btn-outline-brand" href="{{ url_for('listings.browse') }}"><i class="bi bi-search"></i> Find a service</a>
+        <a class="btn btn-gold" href="{{ url_for('requests.index') }}"><i class="bi bi-megaphone"></i> Browse requests</a>
+        {% else %}
+        <a class="btn btn-outline-ink" href="{{ url_for('admin.dashboard') }}"><i class="bi bi-shield-check"></i> Admin console</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-section">
+  <div class="container">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+      {% if not current_user.is_admin %}
+      <div class="status-tabs" aria-label="Booking role">
+        <a class="{{ 'active' if view == 'seeking' }}" href="{{ url_for('bookings.index', view='seeking', state=state) }}">
+          As a seeker <span class="count">{{ seeking_total }}</span>
+        </a>
+        <a class="{{ 'active' if view == 'providing' }}" href="{{ url_for('bookings.index', view='providing', state=state) }}">
+          As a provider <span class="count">{{ providing_total }}</span>
+        </a>
+      </div>
+      {% else %}
+      <div class="status-tabs" aria-label="Booking role">
+        <a class="active" href="{{ url_for('bookings.index', state=state) }}">Platform-wide <span class="count">{{ total_count }}</span></a>
+      </div>
+      {% endif %}
+
+      <div class="status-tabs" aria-label="Booking status">
+        <a class="{{ 'active' if state == 'all' }}" href="{{ url_for('bookings.index', view=view, state='all') }}">All <span class="count">{{ total_count }}</span></a>
+        <a class="{{ 'active' if state == 'active' }}" href="{{ url_for('bookings.index', view=view, state='active') }}">Active <span class="count">{{ active_count }}</span></a>
+        <a class="{{ 'active' if state == 'history' }}" href="{{ url_for('bookings.index', view=view, state='history') }}">History <span class="count">{{ history_count }}</span></a>
+      </div>
+    </div>
+
+    {% if pagination.items %}
+      {% if current_user.is_admin %}
+      <div class="panel">
+        <div class="table-scroll">
+          <table class="site-table">
+            <thead>
+              <tr>
+                <th>Reference</th>
+                <th>Service</th>
+                <th>Seeker</th>
+                <th>Provider</th>
+                <th>Scheduled</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for booking in pagination.items %}
+              <tr>
+                <td><span class="ref" style="font-family: monospace; font-size: 10.5px;">{{ booking.reference }}</span></td>
+                <td><strong>{{ booking.title|truncate(34) }}</strong></td>
+                <td><span class="table-user">{{ avatar(booking.seeker, 'xs') }}<span><strong>{{ booking.seeker.full_name }}</strong><span>{{ booking.seeker.student_number }}</span></span></span></td>
+                <td><span class="table-user">{{ avatar(booking.provider, 'xs') }}<span><strong>{{ booking.provider.full_name }}</strong><span>{{ booking.provider.student_number }}</span></span></span></td>
+                <td>{{ booking.scheduled_at|datetime('%d %b · %H:%M') }}</td>
+                <td>{{ booking.price|money }}</td>
+                <td>{{ status_badge(booking.status_meta) }}</td>
+                <td><a class="btn btn-outline-ink" href="{{ url_for('bookings.detail', booking_id=booking.id) }}">View</a></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% else %}
+      <div class="booking-list">
+        {% for booking in pagination.items %}{{ booking_card(booking, current_user) }}{% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="mt-4">{{ pagination_nav(pagination, 'Booking pages') }}</div>
+    {% else %}
+      <div class="panel">
+        <div class="empty-state">
+          <div class="empty-icon"><i class="bi bi-calendar2-week"></i></div>
+          {% if state == 'active' %}
+            <h3>No active bookings</h3>
+            <p>Nothing is waiting on you right now. Completed and cancelled bookings are under History.</p>
+          {% elif state == 'history' %}
+            <h3>No booking history yet</h3>
+            <p>Your completed, cancelled, and declined bookings will appear here.</p>
+          {% elif view == 'providing' and not current_user.is_admin %}
+            <h3>No bookings as a provider yet</h3>
+            <p>Publish a service or send offers on student requests to start receiving bookings.</p>
+            <div class="d-flex gap-2 justify-content-center flex-wrap">
+              <a class="btn btn-brand btn-sm" href="{{ url_for('listings.create') }}">Create a listing</a>
+              <a class="btn btn-outline-ink btn-sm" href="{{ url_for('requests.index') }}">Browse requests</a>
+            </div>
+          {% else %}
+            <h3>No bookings yet</h3>
+            <p>Book a campus service to see its escrow timeline and updates here.</p>
+            <a class="btn btn-brand btn-sm" href="{{ url_for('listings.browse') }}">Browse services</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

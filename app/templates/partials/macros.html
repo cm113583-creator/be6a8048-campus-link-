@@ -1,0 +1,136 @@
+{% macro avatar(user, size='md') -%}
+<span class="avatar avatar-{{ size }} avatar-tone-{{ user.avatar_tone }}" title="{{ user.full_name }}">{{ user.initials }}</span>
+{%- endmacro %}
+
+{% macro rating_stars(value, count=None, size='sm') -%}
+{% set v = value|float if value is not none else 0 %}
+<span class="rating rating-{{ size }}" aria-label="{{ '%.1f'|format(v) }} out of 5">
+  {% for i in range(1, 6) %}
+    {% if v >= i %}<i class="bi bi-star-fill"></i>
+    {% elif v >= i - 0.5 %}<i class="bi bi-star-half"></i>
+    {% else %}<i class="bi bi-star"></i>{% endif %}
+  {% endfor %}
+  {% if count is not none %}<span class="rating-count">({{ count }})</span>{% endif %}
+</span>
+{%- endmacro %}
+
+{% macro verified_badge(user, compact=false) -%}
+{% if user.is_verified %}
+<span class="verified-badge" title="Verified student"><i class="bi bi-patch-check-fill"></i>{% if not compact %} Verified{% endif %}</span>
+{% endif %}
+{%- endmacro %}
+
+{% macro provider_rating(user) -%}
+{% if user.review_count %}
+  <span class="provider-rating">{{ rating_stars(user.rating_avg) }}<strong>{{ user.rating_display }}</strong><span>({{ user.review_count }})</span></span>
+{% else %}
+  <span class="provider-rating new-provider">New provider</span>
+{% endif %}
+{%- endmacro %}
+
+{% macro status_badge(meta) -%}
+<span class="badge-soft badge-soft-{{ meta.color }}">{{ meta.label }}</span>
+{%- endmacro %}
+
+{% macro service_card(service) -%}
+<article class="service-card">
+  <a class="service-cover" href="{{ url_for('listings.detail', service_id=service.id) }}" style="--cat: {{ service.category.color }};">
+    <span class="cover-category">{{ service.category.name }}</span>
+    <span class="cover-icon"><i class="bi {{ service.category.icon }}"></i></span>
+    {% if service.status != 'active' %}
+      <span class="cover-state">{{ service.status_meta.label }}</span>
+    {% endif %}
+  </a>
+  <div class="service-body">
+    <div class="service-heading">
+      <h3><a href="{{ url_for('listings.detail', service_id=service.id) }}">{{ service.title }}</a></h3>
+      <div class="service-price">{{ service.price|money }}<span>/ {{ service.price_unit|replace('per ', '') }}</span></div>
+    </div>
+    <p class="service-desc">{{ service.description|truncate(105) }}</p>
+    <a class="provider-line" href="{{ url_for('main.profile', user_id=service.provider.id) }}">
+      {{ avatar(service.provider, 'xs') }}
+      <span class="provider-name">{{ service.provider.full_name }}</span>
+      {{ verified_badge(service.provider, compact=true) }}
+      {{ provider_rating(service.provider) }}
+    </a>
+    <div class="service-meta">
+      <span><i class="bi bi-geo-alt"></i>{{ service.campus_area }}</span>
+      <span><i class="bi bi-clock"></i>{{ service.availability_summary }}</span>
+    </div>
+  </div>
+</article>
+{%- endmacro %}
+
+{% macro request_card(item) -%}
+<article class="request-card">
+  <div class="request-top">
+    <span class="category-chip" style="--cat: {{ item.category.color }};"><i class="bi {{ item.category.icon }}"></i>{{ item.category.name }}</span>
+    {{ status_badge(item.status_meta) }}
+  </div>
+  <h3><a href="{{ url_for('requests.detail', request_id=item.id) }}">{{ item.title }}</a></h3>
+  <p>{{ item.description|truncate(120) }}</p>
+  <div class="request-meta">
+    <span class="request-budget">{{ item.budget|money }}</span>
+    <span><i class="bi bi-people"></i>{{ item.offer_count }} offer{{ '' if item.offer_count == 1 else 's' }}</span>
+    <span><i class="bi bi-geo-alt"></i>{{ item.campus_area }}</span>
+    {% if item.needed_by %}<span><i class="bi bi-calendar3"></i>by {{ item.needed_by|date('%d %b') }}</span>{% endif %}
+  </div>
+  <div class="request-footer">
+    <span class="requester">{{ avatar(item.seeker, 'xs') }} {{ item.seeker.full_name }}</span>
+    <span class="text-muted small">{{ item.created_at|datetime('%d %b') }}</span>
+  </div>
+</article>
+{%- endmacro %}
+
+{% macro booking_card(booking, user) -%}
+{% set other = booking.other_party(user) %}
+<a class="booking-row" href="{{ url_for('bookings.detail', booking_id=booking.id) }}">
+  <div class="booking-when">
+    <span class="when-day">{{ booking.scheduled_at|date('%d') }}</span>
+    <span class="when-month">{{ booking.scheduled_at|date('%b') }}</span>
+    <span class="when-time">{{ booking.scheduled_at|time }}</span>
+  </div>
+  <div class="booking-main">
+    <div class="booking-title-line">
+      <strong>{{ booking.title }}</strong>
+      {{ status_badge(booking.status_meta) }}
+    </div>
+    <div class="booking-sub">
+      <span>{{ avatar(other, 'xs') }} with {{ other.full_name }}</span>
+      <span class="ref">{{ booking.reference }}</span>
+    </div>
+  </div>
+  <div class="booking-amount">{{ booking.price|money }}</div>
+  <i class="bi bi-chevron-right booking-chevron"></i>
+</a>
+{%- endmacro %}
+
+{% macro field_error(errors, key) -%}
+{% if errors.get(key) %}<div class="invalid-feedback d-block">{{ errors.get(key) }}</div>{% endif %}
+{%- endmacro %}
+
+{% macro pagination_nav(pagination, label='Pagination') -%}
+{% if pagination.pages > 1 %}
+{% set args = request.args.to_dict() %}
+<nav aria-label="{{ label }}">
+  <ul class="pagination justify-content-center">
+    <li class="page-item {{ 'disabled' if not pagination.has_prev }}">
+      {% set _ = args.update({'page': pagination.prev_num or 1}) %}
+      <a class="page-link" href="{{ url_for(request.endpoint, **args) }}" aria-label="Previous"><i class="bi bi-chevron-left"></i></a>
+    </li>
+    {% for page_number in pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+      {% if page_number %}
+        {% set _ = args.update({'page': page_number}) %}
+        <li class="page-item {{ 'active' if page_number == pagination.page }}"><a class="page-link" href="{{ url_for(request.endpoint, **args) }}">{{ page_number }}</a></li>
+      {% else %}
+        <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+    <li class="page-item {{ 'disabled' if not pagination.has_next }}">
+      {% set _ = args.update({'page': pagination.next_num or pagination.pages}) %}
+      <a class="page-link" href="{{ url_for(request.endpoint, **args) }}" aria-label="Next"><i class="bi bi-chevron-right"></i></a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+{%- endmacro %}

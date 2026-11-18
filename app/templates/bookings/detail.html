@@ -1,0 +1,530 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import avatar, rating_stars, verified_badge, status_badge, provider_rating %}
+{% block title %}{{ booking.reference }} · {{ APP_NAME }}{% endblock %}
+{% block content %}
+{% set counterpart = booking.provider if is_seeker else booking.seeker %}
+{% set review = booking.review %}
+{% set payment = booking.payment %}
+
+<header class="booking-header">
+  <div class="container">
+    <div class="ref-line">
+      <a href="{{ url_for('bookings.index') }}"><i class="bi bi-arrow-left"></i> My bookings</a>
+      <span>·</span>
+      <span>{{ booking.reference }}</span>
+      {{ status_badge(booking.status_meta) }}
+      {% if is_admin %}<span class="badge-soft badge-soft-purple">Admin view</span>{% endif %}
+    </div>
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+      <div>
+        <h1>{{ booking.title }}</h1>
+        <div class="booking-sub">
+          <span><i class="bi bi-calendar3"></i>{{ booking.scheduled_at|datetime('%A, %d %B %Y · %H:%M') }}</span>
+          <span><i class="bi bi-clock"></i>{{ booking.quantity_label() }}</span>
+          <span><i class="bi bi-geo-alt"></i>{{ booking.location }}</span>
+          <span>{{ avatar(booking.provider, 'xs') }} with {{ booking.provider.full_name }}</span>
+        </div>
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        <a class="btn btn-outline-ink btn-sm" href="{{ url_for('bookings.calendar', booking_id=booking.id) }}"><i class="bi bi-calendar-plus"></i> Add to calendar</a>
+        {% if is_admin %}
+        <a class="btn btn-outline-ink btn-sm" href="{{ url_for('admin.dashboard') }}"><i class="bi bi-shield-check"></i> Admin console</a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="page-section">
+  <div class="container">
+    {% if booking.provider.is_suspended and booking.status in ('pending', 'accepted') %}
+    <div class="alert app-alert alert-danger mb-4" role="alert">
+      <i class="bi bi-exclamation-octagon"></i>
+      <div>This provider's account is suspended. The booking cannot move forward while it is under review.</div>
+    </div>
+    {% endif %}
+
+    <div class="booking-layout">
+      <div>
+        <div class="panel mb-4 d-flex align-items-start gap-3">
+          {% if booking.status == 'pending' %}
+            <span class="notification-icon"><i class="bi bi-inbox"></i></span>
+            <div>
+              {% if is_provider %}
+              <strong>New request — respond to confirm</strong>
+              <p class="small-note mb-0">Accept to reserve the slot in your calendar, or decline with a reason. Payment only starts after you accept.</p>
+              {% elif is_seeker %}
+              <strong>Waiting for {{ booking.provider.first_name }}</strong>
+              <p class="small-note mb-0">Your request was sent. You will be notified as soon as the provider accepts or declines it.</p>
+              {% else %}
+              <strong>Awaiting provider response</strong>
+              <p class="small-note mb-0">The provider has not responded yet. No escrow funds have been taken.</p>
+              {% endif %}
+            </div>
+          {% elif booking.status == 'accepted' %}
+            <span class="notification-icon" style="background: var(--gold-soft); color: var(--gold-dark);"><i class="bi bi-wallet2"></i></span>
+            <div>
+              {% if is_seeker %}
+              <strong>Accepted — pay into escrow to confirm</strong>
+              <p class="small-note mb-0">Pay {{ booking.price|money }} from your wallet. CampusLink holds the funds until you confirm the work is delivered.</p>
+              {% elif is_provider %}
+              <strong>Accepted — waiting for escrow payment</strong>
+              <p class="small-note mb-0">The booking is confirmed once {{ booking.seeker.first_name }} pays into escrow. Do not start the job until the funds are secured.</p>
+              {% else %}
+              <strong>Accepted — awaiting escrow payment</strong>
+              <p class="small-note mb-0">The provider accepted and the seeker has been asked to pay.</p>
+              {% endif %}
+            </div>
+          {% elif booking.status == 'in_escrow' %}
+            <span class="notification-icon"><i class="bi bi-shield-lock"></i></span>
+            <div>
+              {% if is_seeker %}
+              <strong>In progress — your payment is protected</strong>
+              <p class="small-note mb-0">{{ booking.provider.first_name }} has been paid into escrow and is completing the job. Confirm only once you are happy with the delivery.</p>
+              {% elif is_provider %}
+              <strong>Payment secured — ready to deliver</strong>
+              <p class="small-note mb-0">The seeker's payment is held in escrow. Complete the work, then mark it as delivered.</p>
+              {% else %}
+              <strong>In progress — funds held in escrow</strong>
+              <p class="small-note mb-0">The seeker paid and the provider is expected to deliver.</p>
+              {% endif %}
+            </div>
+          {% elif booking.status == 'delivered' %}
+            <span class="notification-icon" style="background: var(--gold-soft); color: var(--gold-dark);"><i class="bi bi-box-seam"></i></span>
+            <div>
+              {% if is_seeker %}
+              <strong>Delivered — confirm to release payment</strong>
+              <p class="small-note mb-0">Check the work first. Confirming completion releases the escrowed funds to {{ booking.provider.first_name }} and unlocks a review.</p>
+              {% elif is_provider %}
+              <strong>Delivered — waiting for confirmation</strong>
+              <p class="small-note mb-0">The seeker has been asked to confirm completion. Funds are released from escrow once they do.</p>
+              {% else %}
+              <strong>Delivered — awaiting seeker confirmation</strong>
+              <p class="small-note mb-0">Escrowed funds remain on hold until the seeker confirms.</p>
+              {% endif %}
+            </div>
+          {% elif booking.status == 'completed' %}
+            <span class="notification-icon"><i class="bi bi-check2-circle"></i></span>
+            <div>
+              <strong>Booking completed</strong>
+              <p class="small-note mb-0">Escrow was released to {{ booking.provider.full_name }} on {{ booking.completed_at|date('%d %b %Y') }}.{% if review %} The seeker left a review.{% elif is_seeker %} You can still leave a review below.{% endif %}</p>
+            </div>
+          {% elif booking.status == 'disputed' %}
+            <span class="notification-icon" style="background: var(--danger-soft); color: var(--danger);"><i class="bi bi-exclamation-octagon"></i></span>
+            <div>
+              <strong>Dispute under review</strong>
+              <p class="small-note mb-0">Escrowed funds stay on hold while an administrator reviews the case. You will be notified when a decision is made.</p>
+            </div>
+          {% elif booking.status == 'declined' %}
+            <span class="notification-icon"><i class="bi bi-x-circle"></i></span>
+            <div>
+              <strong>Request declined</strong>
+              <p class="small-note mb-0">{{ booking.provider.first_name }} declined this request{% if booking.cancellation_reason %} — “{{ booking.cancellation_reason }}”{% endif %}. No payment was taken.</p>
+            </div>
+          {% elif booking.status == 'refunded' %}
+            <span class="notification-icon" style="background: var(--blue-soft); color: var(--blue);"><i class="bi bi-arrow-counterclockwise"></i></span>
+            <div>
+              <strong>Booking refunded</strong>
+              <p class="small-note mb-0">The escrowed payment was returned to {{ booking.seeker.first_name }}'s wallet{% if booking.cancellation_reason %} — “{{ booking.cancellation_reason }}”{% endif %}.</p>
+            </div>
+          {% elif booking.status == 'cancelled' %}
+            <span class="notification-icon"><i class="bi bi-slash-circle"></i></span>
+            <div>
+              <strong>Booking cancelled</strong>
+              <p class="small-note mb-0">This booking was cancelled{% if booking.cancellation_reason %} — “{{ booking.cancellation_reason }}”{% endif %}.{% if not booking.paid_at %} No payment was taken.{% endif %}</p>
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="panel mb-4">
+          <div class="panel-head">
+            <div><h2>Booking progress</h2><p>Each step is timestamped so both sides can see what happened.</p></div>
+            {{ status_badge(booking.status_meta) }}
+          </div>
+          <ul class="timeline">
+            <li class="done">
+              <span class="timeline-dot"><i class="bi bi-send-check"></i></span>
+              <h4>Request sent</h4>
+              <p>{{ booking.seeker.full_name }} requested “{{ booking.title }}”.</p>
+              <span class="time">{{ booking.created_at|datetime }}</span>
+            </li>
+            <li class="{{ 'done' if booking.accepted_at else ('current' if booking.status == 'pending' else '') }}">
+              <span class="timeline-dot"><i class="bi bi-hand-thumbs-up"></i></span>
+              <h4>Provider accepts</h4>
+              <p>
+                {% if booking.accepted_at %}{{ booking.provider.full_name }} accepted the request.
+                {% elif booking.status == 'pending' %}Waiting for {{ booking.provider.first_name }} to respond.
+                {% else %}Not accepted.{% endif %}
+              </p>
+              {% if booking.accepted_at %}<span class="time">{{ booking.accepted_at|datetime }}</span>{% endif %}
+            </li>
+            <li class="{{ 'done' if booking.paid_at else ('current' if booking.status == 'accepted' else '') }}">
+              <span class="timeline-dot"><i class="bi bi-shield-lock"></i></span>
+              <h4>Payment held in escrow</h4>
+              <p>
+                {% if payment %}{{ payment.amount|money }} secured by CampusLink.
+                {% elif booking.status == 'accepted' %}The seeker needs to pay {{ booking.price|money }} into escrow.
+                {% else %}No payment has been taken.{% endif %}
+              </p>
+              {% if booking.paid_at %}<span class="time">{{ booking.paid_at|datetime }}</span>{% endif %}
+            </li>
+            <li class="{{ 'done' if booking.delivered_at else ('current' if booking.status == 'in_escrow' else '') }}">
+              <span class="timeline-dot"><i class="bi bi-box-seam"></i></span>
+              <h4>Service delivered</h4>
+              <p>
+                {% if booking.delivered_at %}{{ booking.provider.first_name }} marked the work as delivered.
+                {% elif booking.status == 'in_escrow' %}Waiting for {{ booking.provider.first_name }} to deliver.
+                {% else %}Not delivered yet.{% endif %}
+              </p>
+              {% if booking.delivered_at %}<span class="time">{{ booking.delivered_at|datetime }}</span>{% endif %}
+            </li>
+            <li class="{{ 'done' if booking.completed_at else ('current' if booking.status == 'delivered' else '') }}">
+              <span class="timeline-dot"><i class="bi bi-check2-circle"></i></span>
+              <h4>Seeker confirms &amp; escrow releases</h4>
+              <p>
+                {% if booking.completed_at %}Payment released to {{ booking.provider.first_name }}.
+                {% elif booking.status == 'delivered' %}Waiting for {{ booking.seeker.first_name }} to confirm completion.
+                {% else %}Confirmation unlocks the payout.{% endif %}
+              </p>
+              {% if booking.completed_at %}<span class="time">{{ booking.completed_at|datetime }}</span>{% endif %}
+            </li>
+            {% if booking.status == 'declined' %}
+            <li class="current">
+              <span class="timeline-dot"><i class="bi bi-x-lg"></i></span>
+              <h4>Request declined</h4>
+              <p>{{ booking.cancellation_reason or 'Declined by provider' }}</p>
+              <span class="time">{{ booking.cancelled_at|datetime }}</span>
+            </li>
+            {% elif booking.status == 'cancelled' %}
+            <li class="current">
+              <span class="timeline-dot"><i class="bi bi-slash-circle"></i></span>
+              <h4>Booking cancelled</h4>
+              <p>{{ booking.cancellation_reason or 'Cancelled' }}</p>
+              <span class="time">{{ booking.cancelled_at|datetime }}</span>
+            </li>
+            {% elif booking.status == 'refunded' %}
+            <li class="current">
+              <span class="timeline-dot"><i class="bi bi-arrow-counterclockwise"></i></span>
+              <h4>Escrow refunded</h4>
+              <p>{{ booking.cancellation_reason or 'Funds returned to the seeker' }}</p>
+              <span class="time">{{ booking.cancelled_at|datetime }}</span>
+            </li>
+            {% elif booking.status == 'disputed' and booking.dispute %}
+            <li class="current">
+              <span class="timeline-dot"><i class="bi bi-exclamation-octagon"></i></span>
+              <h4>Dispute opened</h4>
+              <p>{{ booking.dispute.reason }} — awaiting admin review.</p>
+              <span class="time">{{ booking.dispute.created_at|datetime }}</span>
+            </li>
+            {% endif %}
+          </ul>
+        </div>
+
+        <div class="panel mb-4">
+          <div class="panel-head">
+            <div><h2>Job details</h2><p>What was agreed when the booking was made.</p></div>
+            {% if booking.service %}<a class="section-link small-note" href="{{ url_for('listings.detail', service_id=booking.service.id) }}">View listing <i class="bi bi-arrow-right"></i></a>{% endif %}
+          </div>
+          <p class="request-description">{{ booking.description }}</p>
+          {% if booking.special_requirements %}
+          <div class="mt-3">
+            <span class="form-section-title d-block">Special requirements</span>
+            <p class="small-note mb-0" style="white-space: pre-line;">{{ booking.special_requirements }}</p>
+          </div>
+          {% endif %}
+          <div class="booking-meta-grid mt-4">
+            <div class="booking-meta-item"><span>Scheduled</span><strong>{{ booking.scheduled_at|datetime('%d %b %Y, %H:%M') }}</strong></div>
+            <div class="booking-meta-item"><span>Duration</span><strong>{{ booking.quantity_label() }}</strong></div>
+            <div class="booking-meta-item"><span>Location</span><strong>{{ booking.location }}</strong></div>
+            <div class="booking-meta-item"><span>Booking amount</span><strong>{{ booking.price|money }}</strong></div>
+          </div>
+          {% if booking.request %}
+          <a class="mini-service mt-3" href="{{ url_for('requests.detail', request_id=booking.request.id) }}">
+            <span class="mini-thumb" style="--cat: {{ booking.category.color if booking.category else 'var(--brand)' }};"><i class="bi bi-megaphone"></i></span>
+            <span class="flex-grow-1 min-w-0">
+              <h4 class="text-truncate">Original request: {{ booking.request.title }}</h4>
+              <span>Budget {{ booking.request.budget|money }} · {{ booking.request.campus_area }}</span>
+            </span>
+            <i class="bi bi-chevron-right text-muted"></i>
+          </a>
+          {% endif %}
+        </div>
+
+        <div class="panel mb-4">
+          <div class="panel-head">
+            <div><h2>People</h2><p>Everyone involved in this booking.</p></div>
+          </div>
+          <div class="people-row">
+            {{ avatar(booking.seeker, 'sm') }}
+            <div class="person-info">
+              <strong>{{ booking.seeker.full_name }}{% if is_seeker %} · you{% endif %}</strong>
+              <span>Seeker · {{ booking.seeker.student_number }}{% if booking.seeker.is_verified %} · verified student{% endif %}</span>
+            </div>
+            <a class="btn btn-outline-ink btn-sm" href="{{ url_for('main.profile', user_id=booking.seeker.id) }}">Profile</a>
+          </div>
+          <div class="people-row">
+            {{ avatar(booking.provider, 'sm') }}
+            <div class="person-info">
+              <strong>{{ booking.provider.full_name }}{% if is_provider %} · you{% endif %}</strong>
+              <span>{{ booking.provider.program or 'Student provider' }}{% if booking.provider.year_of_study %} · {{ booking.provider.year_of_study }}{% endif %}</span>
+            </div>
+            {{ provider_rating(booking.provider) }}
+            <a class="btn btn-outline-ink btn-sm" href="{{ url_for('main.profile', user_id=booking.provider.id) }}">Profile</a>
+          </div>
+        </div>
+
+        {% if payment %}
+        <div class="panel mb-4">
+          <div class="panel-head">
+            <div><h2>Escrow &amp; payment</h2><p>How the money moved for this booking.</p></div>
+            {% set pcolor = {'held': 'warning', 'released': 'success', 'refunded': 'secondary'}.get(payment.status, 'secondary') %}
+            <span class="badge-soft badge-soft-{{ pcolor }}">{{ payment.status_label }}</span>
+          </div>
+          <div class="escrow-summary">
+            <span class="small-note">{{ 'Refunded amount' if payment.status == 'refunded' else ('Amount released' if payment.status == 'released' else 'Amount held in escrow') }}</span>
+            <div class="escrow-amount">{{ payment.amount|money }}</div>
+            <div class="escrow-line"><span>Booking price</span><span>{{ payment.amount|money }}</span></div>
+            <div class="escrow-line"><span>Platform fee (5%)</span><span>{{ payment.platform_fee|money }}</span></div>
+            <div class="escrow-line"><span>{{ 'Provider received' if payment.status == 'released' else 'Provider receives' }}</span><span>{{ payment.provider_amount|money }}</span></div>
+            <div class="escrow-line total"><span>Payment status</span><span>{{ payment.status_label }}</span></div>
+          </div>
+          <div class="d-flex flex-wrap gap-3 mt-3 small-note">
+            {% if booking.paid_at %}<span><i class="bi bi-shield-lock"></i> Paid into escrow {{ booking.paid_at|datetime('%d %b %Y, %H:%M') }}</span>{% endif %}
+            {% if payment.released_at %}<span><i class="bi bi-check2-circle"></i> Released {{ payment.released_at|datetime('%d %b %Y, %H:%M') }}</span>{% endif %}
+            {% if payment.refunded_at %}<span><i class="bi bi-arrow-counterclockwise"></i> Refunded {{ payment.refunded_at|datetime('%d %b %Y, %H:%M') }}</span>{% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if booking.dispute %}
+        <div class="panel mb-4" id="dispute-record">
+          <div class="panel-head">
+            <div><h2>Dispute</h2><p>Opened {{ booking.dispute.created_at|datetime('%d %b %Y, %H:%M') }} by {{ booking.dispute.opened_by.full_name }}.</p></div>
+            {{ status_badge(booking.dispute.status_meta) }}
+          </div>
+          <div class="d-flex gap-2 align-items-start mb-3">
+            <span class="notification-icon" style="background: var(--danger-soft); color: var(--danger);"><i class="bi bi-exclamation-octagon"></i></span>
+            <div>
+              <strong>{{ booking.dispute.reason }}</strong>
+              <p class="small-note mb-0" style="white-space: pre-line;">{{ booking.dispute.details }}</p>
+            </div>
+          </div>
+          {% if booking.dispute.resolution_note %}
+          <div class="booking-meta-item">
+            <span>Resolution note</span>
+            <strong style="font-weight: 500; line-height: 1.6;">{{ booking.dispute.resolution_note }}</strong>
+          </div>
+          {% endif %}
+          {% if is_admin %}
+          <a class="btn btn-outline-ink btn-sm mt-3" href="{{ url_for('admin.dispute_detail', dispute_id=booking.dispute.id) }}"><i class="bi bi-shield-check"></i> Review in admin console</a>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if can_dispute %}
+        <div class="panel mb-4" id="dispute">
+          <div class="panel-head">
+            <div><h2>Open a dispute</h2><p>Use this if the job cannot be completed as agreed. Funds stay in escrow while an administrator investigates.</p></div>
+            <i class="bi bi-exclamation-octagon" style="color: var(--danger);"></i>
+          </div>
+          <form method="post" action="{{ url_for('bookings.dispute', booking_id=booking.id) }}" data-confirm="Open a dispute? The escrowed funds will stay on hold until an administrator decides.">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+              <label class="form-label" for="dispute-reason">Reason</label>
+              <select class="form-select" id="dispute-reason" name="reason" required>
+                <option value="" disabled selected>Choose a reason</option>
+                <option>Service not delivered</option>
+                <option>Quality below expectations</option>
+                <option>Provider unresponsive</option>
+                <option>Seeker unresponsive</option>
+                <option>Payment or pricing issue</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="dispute-details">What happened?</label>
+              <textarea class="form-control" id="dispute-details" name="details" rows="4" minlength="20" maxlength="2000" placeholder="Explain the issue with dates and any agreement you made (at least 20 characters)." required></textarea>
+            </div>
+            <button class="btn btn-danger-soft" type="submit"><i class="bi bi-flag"></i> Submit dispute</button>
+          </form>
+        </div>
+        {% endif %}
+
+        {% if review %}
+        <div class="panel mb-4" id="review">
+          <div class="panel-head">
+            <div><h2>Review</h2><p>{{ review.author.full_name }} reviewed this booking on {{ review.created_at|date('%d %b %Y') }}.</p></div>
+            {{ rating_stars(review.overall, size='lg') }}
+          </div>
+          <div class="rating-bars">
+            {% for label, value in [('Quality', review.quality), ('Timeliness', review.timeliness), ('Communication', review.communication)] %}
+            <div class="rating-bar-row">
+              <span class="bar-label">{{ label }}</span>
+              <span class="rating-bar-track"><span class="rating-bar-fill" style="width: {{ value / 5 * 100 }}%;"></span></span>
+              <span class="bar-value">{{ value }}/5</span>
+            </div>
+            {% endfor %}
+          </div>
+          {% if review.comment %}<p class="request-description mt-3 mb-0">{{ review.comment }}</p>{% endif %}
+        </div>
+        {% elif can_review %}
+        <div class="panel mb-4" id="review">
+          <div class="panel-head">
+            <div><h2>Leave a review</h2><p>Rate the quality, timeliness, and communication of this job. It directly shapes {{ booking.provider.first_name }}'s reputation.</p></div>
+            <i class="bi bi-star" style="color: var(--gold);"></i>
+          </div>
+          <form method="post" action="{{ url_for('bookings.review', booking_id=booking.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row g-2">
+              <div class="col-md-4">
+                <label class="form-label" for="quality">Quality</label>
+                <select class="form-select" id="quality" name="quality" required>
+                  <option value="" disabled selected>Choose</option>
+                  {% for n in range(5, 0, -1) %}<option value="{{ n }}">{{ n }} — {{ ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'][n] }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="timeliness">Timeliness</label>
+                <select class="form-select" id="timeliness" name="timeliness" required>
+                  <option value="" disabled selected>Choose</option>
+                  {% for n in range(5, 0, -1) %}<option value="{{ n }}">{{ n }} — {{ ['', 'Very late', 'Late', 'On time', 'Prompt', 'Superb'][n] }}</option>{% endfor %}
+                </select>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="communication">Communication</label>
+                <select class="form-select" id="communication" name="communication" required>
+                  <option value="" disabled selected>Choose</option>
+                  {% for n in range(5, 0, -1) %}<option value="{{ n }}">{{ n }} — {{ ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'][n] }}</option>{% endfor %}
+                </select>
+              </div>
+            </div>
+            <div class="mt-3">
+              <label class="form-label" for="comment">Comment <span class="fw-normal text-muted">(optional)</span></label>
+              <textarea class="form-control" id="comment" name="comment" rows="3" maxlength="1000" placeholder="What went well? What could be better for the next student?"></textarea>
+            </div>
+            <button class="btn btn-brand mt-3" type="submit"><i class="bi bi-star"></i> Submit review</button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+
+      <aside class="side-sticky">
+        {% if can_accept or can_pay or can_deliver or can_confirm or can_review or can_dispute %}
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Next step</h3>
+            {{ status_badge(booking.status_meta) }}
+          </div>
+          <div class="action-stack">
+            {% if can_accept %}
+            <form method="post" action="{{ url_for('bookings.accept', booking_id=booking.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-brand w-100" type="submit"><i class="bi bi-check2"></i> Accept request</button>
+            </form>
+            <button class="btn btn-outline-ink" type="button" data-bs-toggle="collapse" data-bs-target="#declineForm" aria-expanded="false" aria-controls="declineForm">
+              <i class="bi bi-x-lg"></i> Decline request
+            </button>
+            {% endif %}
+            {% if can_pay %}
+            <form method="post" action="{{ url_for('bookings.pay', booking_id=booking.id) }}" data-confirm="Pay {{ booking.price|money }} from your wallet into escrow?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-gold w-100" type="submit"><i class="bi bi-shield-lock"></i> Pay {{ booking.price|money }} into escrow</button>
+            </form>
+            <div class="demo-balance">Wallet balance {{ current_user.wallet_balance|money }} · <a href="{{ url_for('main.wallet', next=request.path) }}">Top up</a></div>
+            {% endif %}
+            {% if can_deliver %}
+            <form method="post" action="{{ url_for('bookings.deliver', booking_id=booking.id) }}" data-confirm="Mark this job as delivered? The seeker will be asked to confirm completion.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-brand w-100" type="submit"><i class="bi bi-box-seam"></i> Mark as delivered</button>
+            </form>
+            {% endif %}
+            {% if can_confirm %}
+            <form method="post" action="{{ url_for('bookings.confirm', booking_id=booking.id) }}" data-confirm="Confirm completion? {{ booking.price|money }} will be released from escrow to {{ booking.provider.full_name }}.">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-brand w-100" type="submit"><i class="bi bi-check2-circle"></i> Confirm completion</button>
+            </form>
+            <p class="small-note mb-0">Only confirm when you have received the work. Releases are final.</p>
+            {% endif %}
+            {% if can_review %}
+            <a class="btn btn-gold w-100" href="#review"><i class="bi bi-star"></i> Leave a review</a>
+            {% endif %}
+            {% if can_dispute %}
+            <a class="btn btn-ghost w-100" href="#dispute"><i class="bi bi-flag"></i> Open a dispute</a>
+            {% endif %}
+          </div>
+          {% if can_accept %}
+          <div class="collapse mt-3" id="declineForm">
+            <form method="post" action="{{ url_for('bookings.decline', booking_id=booking.id) }}" data-confirm="Decline this booking request?">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <label class="form-label" for="decline-reason">Reason for declining</label>
+              <textarea class="form-control" id="decline-reason" name="reason" rows="2" maxlength="500" placeholder="Optional, but helpful for the seeker."></textarea>
+              <button class="btn btn-danger-soft w-100 mt-2" type="submit">Decline request</button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="panel">
+          <div class="panel-head"><h3>Quick actions</h3></div>
+          <div class="action-stack">
+            {% if not is_admin %}
+            <form method="post" action="{{ url_for('messages.start', user_id=counterpart.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-soft w-100" type="submit"><i class="bi bi-chat-dots"></i> Message {{ counterpart.first_name }}</button>
+            </form>
+            {% endif %}
+            <a class="btn btn-outline-ink" href="{{ url_for('bookings.calendar', booking_id=booking.id) }}"><i class="bi bi-calendar-plus"></i> Add to calendar</a>
+            {% if booking.service %}
+            <a class="btn btn-outline-ink" href="{{ url_for('listings.detail', service_id=booking.service.id) }}"><i class="bi bi-briefcase"></i> View service listing</a>
+            {% endif %}
+            {% if booking.request %}
+            <a class="btn btn-outline-ink" href="{{ url_for('requests.detail', request_id=booking.request.id) }}"><i class="bi bi-megaphone"></i> View original request</a>
+            {% endif %}
+            {% if is_admin and booking.dispute %}
+            <a class="btn btn-outline-ink" href="{{ url_for('admin.dispute_detail', dispute_id=booking.dispute.id) }}"><i class="bi bi-shield-check"></i> Review dispute</a>
+            {% endif %}
+          </div>
+          <div class="demo-balance">Reference {{ booking.reference }}</div>
+        </div>
+
+        {% if can_cancel %}
+        <div class="panel">
+          <div class="panel-head"><h3>Cancel booking</h3></div>
+          <p class="small-note">
+            {% if booking.status == 'in_escrow' %}
+            Cancelling now refunds the escrowed payment to {{ booking.seeker.first_name }}.
+            {% elif booking.status == 'accepted' %}
+            No money has been taken yet. The provider will be notified.
+            {% else %}
+            The provider has not accepted yet and will be notified.
+            {% endif %}
+          </p>
+          <button class="btn btn-danger-soft w-100" type="button" data-bs-toggle="collapse" data-bs-target="#cancelForm" aria-expanded="false" aria-controls="cancelForm">
+            <i class="bi bi-slash-circle"></i> Cancel booking
+          </button>
+          <div class="collapse mt-3" id="cancelForm">
+            <form method="post" action="{{ url_for('bookings.cancel', booking_id=booking.id) }}" data-confirm="Cancel this booking?{% if booking.status == 'in_escrow' %} The escrowed payment will be refunded to the seeker.{% endif %}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <label class="form-label" for="cancel-reason">Reason</label>
+              <textarea class="form-control" id="cancel-reason" name="reason" rows="2" maxlength="500" placeholder="Optional reason for the cancellation."></textarea>
+              <button class="btn btn-danger-soft w-100 mt-2" type="submit">Confirm cancellation</button>
+            </form>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="panel">
+          <div class="panel-head">
+            <h3>Escrow protection</h3>
+            <i class="bi bi-shield-check text-brand"></i>
+          </div>
+          <p class="small-note mb-0">Payments are held by CampusLink and only released when the seeker confirms delivery. If something goes wrong, either side can open a dispute for admin review.</p>
+          <div class="mini-escrow"><span>Agreed price</span><strong>{{ booking.price|money }}</strong></div>
+          <div class="mini-escrow"><span>Platform fee</span><strong>5%</strong></div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+{% endblock %}

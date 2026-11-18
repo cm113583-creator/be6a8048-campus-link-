@@ -1,0 +1,7 @@
+<div class="admin-nav">
+  <a class="{{ 'active' if request.endpoint == 'admin.dashboard' }}" href="{{ url_for('admin.dashboard') }}">Overview</a>
+  <a class="{{ 'active' if request.endpoint in ['admin.users'] }}" href="{{ url_for('admin.users') }}">Students</a>
+  <a class="{{ 'active' if request.endpoint in ['admin.listings'] }}" href="{{ url_for('admin.listings') }}">Listings</a>
+  <a class="{{ 'active' if request.endpoint in ['admin.disputes', 'admin.dispute_detail'] }}" href="{{ url_for('admin.disputes') }}">Disputes{% if open_disputes %} <span class="badge rounded-pill text-bg-warning">{{ open_disputes }}</span>{% endif %}</a>
+  <a class="{{ 'active' if request.endpoint == 'admin.reports' }}" href="{{ url_for('admin.reports') }}">Reports</a>
+</div>
